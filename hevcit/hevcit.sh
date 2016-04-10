@@ -56,7 +56,7 @@ key="$1"
 	shift
 done
 
-echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Starting" >> $ContLogLocation
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Starting" >> $ContLogLocation
 
 xpath=${1%/*} 
 xbase=${1##*/}
@@ -69,7 +69,7 @@ then
 	echo -e "\e[44mWorking on : $InputFileName\e[0m"
 else
 	echo -e "\e[41m$InputFileName not found. Exiting\e[0m"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Exit - File not found" >> $ContLogLocation
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - File not found" >> $ContLogLocation
 	exit 0
 fi
 
@@ -78,7 +78,7 @@ VideoSource=$(mediainfo --inform="Video;%Format%" "$InputFileName")
 
 if [ "$VideoSource" = "HEVC" ]; then
 	echo -e "\e[41mVideo is already HEVC. Exiting\e[0m"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Exit - Video is already HEVC" >> $ContLogLocation
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Video is already HEVC" >> $ContLogLocation
 	exit 0
 fi
 
@@ -90,14 +90,14 @@ VideoD=$(mediainfo --inform="General;%Duration%" "$InputFileName")
 VideoD=$((VideoD / 1000))
 
 echo -e "\e[44mVideo is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoD seconds long\e[0m"
-echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Video is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoD seconds long" >> $ContLogLocation
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Video is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoD seconds long" >> $ContLogLocation
 
 # if the file is 50fps then make it 25fps
 if [ "$VideoF" = 50 ]; then
 	VideoF=25
 	Resample="-r 25"
 	echo -e "\e[44mGot a 50fps file so wil resample to 25fps\e[0m"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - is 50fps so will resample to 25fps" >> $ContLogLocation
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is 50fps so will resample to 25fps" >> $ContLogLocation
 else
 	Resample=" "
 fi
@@ -108,7 +108,7 @@ if [ "$VideoScan" = "Interlaced" ]; then
 	#Deinterlace='-vf "yadif=0:-1:0"'
 	Deinterlace="-deinterlace"
 	echo -e "\e[44mGot an interlaced file so wil deinterlace\e[0m"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - is interlaced so will deinterlace" >> $ContLogLocation
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is interlaced so will deinterlace" >> $ContLogLocation
 else
 	Deinterlace=""
 fi
@@ -127,7 +127,7 @@ if [ "$ParaBitRate" = "half" ]; then
 		# extract the video	
 		TempVideoFile=`echo "/tmp/$xpref.h264"`
 		echo -e "\e[44mGot a 0 BitRate so extracting Video to $TempVideoFile\e[0m"
-		echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Got a 0 BitRate so extracting to temp file" >> $ContLogLocation
+		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Got a 0 BitRate so extracting to temp file" >> $ContLogLocation
 		ffmpeg -i "$InputFileName" -vcodec copy -an "$TempVideoFile"
 	
 		# get the new file size and work out the bitrate from it
@@ -145,20 +145,20 @@ if [ "$ParaBitRate" = "half" ]; then
 		BitRateTarget="$ContBitRateLow"
 		if [ $BitRateTarget -gt $BitRateSource ]; then
 			echo -e "\e[44mTarget BitRate of $BitRateTarget would be lower than source bitrate of $BitRateSource. So Using source bitrate\e[0m"
-			echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Target bitrate of $BitRateTarget lower than source bitrate of $BitRateSource. So using source bitrate" >> $ContLogLocation
+			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Target bitrate of $BitRateTarget lower than source bitrate of $BitRateSource. So using source bitrate" >> $ContLogLocation
 			BitRateTarget="$BitRateSource"
 		fi
 	fi
 	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate will be 1/2 that at : $BitRateTarget\e[0m"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - 1/2 Bitrate - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation	
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - 1/2 Bitrate - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation	
 elif [ "$ParaBitRate" = "calc" ]; then
 	# calculate the bitrate from the video file properties
 	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoF) / 1000000) + 11) * 37" | bc)
 	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate based video size : $BitRateTarget\e[0m"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Bitrate calculated - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation	
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Bitrate calculated - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation	
 else
 	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget\e[0m"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Bitrate given - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Bitrate given - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation
 fi
 
 # work out the audio format in the source file
@@ -193,18 +193,18 @@ case "$AudioChannels" in
 				FileFormat=".mkv"
 			;;
 			*) 	echo -e "\e[41mError - Strange audio format. Exiting\e[0m"
-				echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Exit - Strange audio format" >> $ContLogLocation				
+				echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange audio format" >> $ContLogLocation				
 			;;
 		esac
 	;;
 	*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
-		echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
+		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
 
 	;;
 esac
 
 echo -e "\e[44mSource Audio is $AudioChannels channel $AudioFormat at $AudioBitRate bps & $AudioSampleRate Khz and therefore will be $AudioAction\e[0m"
-echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Audio is $AudioChannels channel $AudioFormat at $AudioBitRate bps & $AudioSampleRate Khz and will be $AudioAction." >> $ContLogLocation
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Audio is $AudioChannels channel $AudioFormat at $AudioBitRate bps & $AudioSampleRate Khz and will be $AudioAction." >> $ContLogLocation
 
 
 # backup the current file or change the target name
@@ -212,7 +212,7 @@ if [ "$ParaFile" = "backup" ]; then
 	BackupFile=`echo "$ContBackupLocation""$xbase"`
 	echo -e "\e[44mBacking up file to $BackupFile\e[0m"
 	mv "$InputFileName" "$BackupFile"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Backup Complete" >> $ContLogLocation		
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Backup Complete" >> $ContLogLocation		
 
 	# calculate file names
 	if [ "$xpath" = "$xbase" ]; then
@@ -228,19 +228,24 @@ elif [ "$ParaFile" = "new" ]; then
 	TargetFile=`echo "$xpath/$xpref$FileNew$FileFormat"`
 else
 	echo -e "\e[41mError in backup calculation - Exiting\e[0m"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Exit - Error in backup calculation." >> $ContLogLocation	
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Error in backup calculation." >> $ContLogLocation	
 	exit 0	
 fi
 
 # Encode the file
 echo -e "\e[44mEncode from $EncodeFile to $TargetFile\e[0m"
+
 # run ffmpeg with the correct settings we've just calculated
-echo -e "\e[44mffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} "$TargetFile"\e[0m"
-echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Encoding with - ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} "$TargetFile"" >> $ContLogLocation
-ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} "$TargetFile"
+EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
+
+echo -e "\e[46mffmpeg -i '$EncodeFile' -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m"
+echo `date +%Y-%m-%d\ %H:%M:%S` "ffmpeg -i '$EncodeFile' -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m" >> $ContLogLocation
+
+# do the encode
+#ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time="$EncodeDate" "$TargetFile"
 
 echo -e "\e[44m$InputFileName - Complete\e[0m\n\r"
-echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Complete" >> $ContLogLocation
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Complete" >> $ContLogLocation
 
 exit 0
 
