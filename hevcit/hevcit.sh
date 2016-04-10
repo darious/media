@@ -32,8 +32,7 @@ key="$1"
 				ParaBitRate="half"
 			;;
 			*)
-				echo -e "\e[41mError : Invalid parameters passed\e[0m"
-				exit 0
+				BitRateTarget="$2"
 			;;
 		esac
 		shift
@@ -158,9 +157,8 @@ elif [ "$ParaBitRate" = "calc" ]; then
 	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate based video size : $BitRateTarget\e[0m"
 	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Bitrate calculated - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation	
 else
-	echo -e "\e[41mError in bitrate calculation Exiting\e[0m"
-	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Exit - Error in bitrate calculation." >> $ContLogLocation	
-	exit 0
+	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget\e[0m"
+	echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Bitrate given - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation
 fi
 
 # work out the audio format in the source file
