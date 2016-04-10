@@ -242,7 +242,7 @@ echo -e "\e[46mffmpeg -i '$EncodeFile' -vcodec nvenc_hevc -b:v ${BitRateTarget}k
 echo `date +%Y-%m-%d\ %H:%M:%S` "ffmpeg -i '$EncodeFile' -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m" >> $ContLogLocation
 
 # do the encode
-#ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time="$EncodeDate" "$TargetFile"
+ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time="$EncodeDate" "$TargetFile"
 
 echo -e "\e[44m$InputFileName - Complete\e[0m\n\r"
 echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Complete" >> $ContLogLocation
