@@ -235,11 +235,11 @@ fi
 # Encode the file
 echo -e "\e[44mEncode from $EncodeFile to $TargetFile\e[0m"
 # run ffmpeg with the correct settings we've just calculated
-echo -e "\e[44mffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k $Resample $Deinterlace ${AudioConvert} "$TargetFile"\e[0m"
-echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Encoding with - ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k $Resample $Deinterlace ${AudioConvert} "$TargetFile"" >> $ContLogLocation
-ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k $Resample $Deinterlace ${AudioConvert} "$TargetFile"
+echo -e "\e[44mffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} "$TargetFile"\e[0m"
+echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Encoding with - ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} "$TargetFile"" >> $ContLogLocation
+ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} "$TargetFile"
 
-echo -e "\e[44m$InputFileName - Complete\e[0m"
+echo -e "\e[44m$InputFileName - Complete\e[0m\n\r"
 echo `date +%Y-%m-%d_%H:%M:%S` ": $InputFileName - Complete" >> $ContLogLocation
 
 exit 0
