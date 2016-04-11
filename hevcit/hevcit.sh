@@ -188,18 +188,19 @@ case "$AudioChannels" in
 					FileFormat=".mkv"
 				fi
 			;;
-			DTS)	AudioAction="passed through"
-				AudioConvert="-acodec copy"
+			DTS)	AudioAction="recoded to 384k AC3"
+				AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
 				FileFormat=".mkv"
 			;;
 			*) 	echo -e "\e[41mError - Strange audio format. Exiting\e[0m"
-				echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange audio format" >> $ContLogLocation				
+				echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange audio format" >> $ContLogLocation
+				exit 0
 			;;
 		esac
 	;;
 	*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
-
+		exit 0
 	;;
 esac
 
