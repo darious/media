@@ -128,6 +128,8 @@ if [ "$ParaBitRate" = "half" ]; then
 		TempVideoFile=`echo "/tmp/$xpref.h264"`
 		echo -e "\e[44mGot a 0 BitRate so extracting Video to $TempVideoFile\e[0m"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Got a 0 BitRate so extracting to temp file" >> $ContLogLocation
+		rm "$TempVideoFile"
+		echo -e "\e[46mffmpeg -i '$InputFileName' -vcodec copy -an '$TempVideoFile'\e[0m"
 		ffmpeg -i "$InputFileName" -vcodec copy -an "$TempVideoFile"
 	
 		# get the new file size and work out the bitrate from it
