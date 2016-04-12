@@ -6,6 +6,14 @@
 # -b|--bitrate		: Calulate the bitrate, default is to 1/2 the size
 # -f|--fileformat 	: Skip the backup, appends _new to the end of the filename instead
 
+
+convertsecs() {
+ ((h=${1}/3600))
+ ((m=(${1}%3600)/60))
+ ((s=${1}%60))
+ printf "%02d:%02d:%02d\n" $h $m $s
+}
+
 # constants
 ContBackupLocation="/media/stewie/backup/"
 ContLogLocation="/var/log/hevcit/hevcit.log"
@@ -88,9 +96,10 @@ VideoH=$(mediainfo --inform="Video;%Height%" "$InputFileName")
 VideoF=$(ffmpeg -i "$1" 2>&1 | sed -n "s/.*, \(.*\) fp.*/\1/p")
 VideoD=$(mediainfo --inform="General;%Duration%" "$InputFileName")
 VideoD=$((VideoD / 1000))
+VideoDT=$(convertsecs $VideoD)
 
-echo -e "\e[44mVideo is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoD seconds long\e[0m"
-echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Video is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoD seconds long" >> $ContLogLocation
+echo -e "\e[44mVideo is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoDT in length\e[0m"
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Video is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoDT in length" >> $ContLogLocation
 
 # fiddle with the framerate 
 case "$VideoF" in
@@ -140,51 +149,53 @@ BitRateSource=$(mediainfo --inform="Video;%BitRate%" "$InputFileName")
 # convert to Kbps
 BitRateSource=$((BitRateSource / 1000))
 
+# deal with a 0 bitrate
+if [ "$BitRateSource" = 0 ]; then
+	# extract the video	
+	TempVideoFile=`echo "/tmp/$xpref.h264"`
+	echo -e "\e[44mGot a 0 BitRate so extracting Video to $TempVideoFile\e[0m"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Got a 0 BitRate so extracting to temp file" >> $ContLogLocation
+	rm "$TempVideoFile"
+	echo -e "\e[46mffmpeg -i '$InputFileName' -vcodec copy -an '$TempVideoFile'\e[0m"
+	ffmpeg -i "$InputFileName" -vcodec copy -an "$TempVideoFile"
+
+	# get the new file size and work out the bitrate from it
+	TempVideoFileSize=$(mediainfo --inform="General;%FileSize%" "$TempVideoFile")
+	TempVideoFileSize=$((TempVideoFileSize / 1000))
+	BitRateSource=$(((TempVideoFileSize / VideoD) * 8))
+	rm "$TempVideoFile"
+fi
+
 # workout the target bitrate
 if [ "$ParaBitRate" = "half" ]; then
-	# Work out 1/2 the current
-
-	# deal with a 0 bitrate
-	if [ "$BitRateSource" = 0 ]; then
-		# extract the video	
-		TempVideoFile=`echo "/tmp/$xpref.h264"`
-		echo -e "\e[44mGot a 0 BitRate so extracting Video to $TempVideoFile\e[0m"
-		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Got a 0 BitRate so extracting to temp file" >> $ContLogLocation
-		rm "$TempVideoFile"
-		echo -e "\e[46mffmpeg -i '$InputFileName' -vcodec copy -an '$TempVideoFile'\e[0m"
-		ffmpeg -i "$InputFileName" -vcodec copy -an "$TempVideoFile"
-	
-		# get the new file size and work out the bitrate from it
-		TempVideoFileSize=$(mediainfo --inform="General;%FileSize%" "$TempVideoFile")
-		TempVideoFileSize=$((TempVideoFileSize / 1000))
-		BitRateSource=$(((TempVideoFileSize / VideoD) * 8))
-		rm "$TempVideoFile"
-	fi
-
 	# Calculate the target bit rate as the 1/2 the source 
 	BitRateTarget=$((BitRateSource / 2))
-
-	# check the bitrate is ok
-	if [ "$BitRateTarget" -lt $ContBitRateLow ]; then
-		BitRateTarget="$ContBitRateLow"
-		if [ $BitRateTarget -gt $BitRateSource ]; then
-			echo -e "\e[44mTarget BitRate of $BitRateTarget would be lower than source bitrate of $BitRateSource. So Using source bitrate\e[0m"
-			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Target bitrate of $BitRateTarget lower than source bitrate of $BitRateSource. So using source bitrate" >> $ContLogLocation
-			BitRateTarget="$BitRateSource"
-		fi
-	fi
-	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate will be 1/2 that at : $BitRateTarget\e[0m"
-	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - 1/2 Bitrate - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation	
+	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate will be 1/2 that : $BitRateTarget\e[0m"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate will be 1/2 that : $BitRateTarget"  >> $ContLogLocation
 
 elif [ "$ParaBitRate" = "calc" ]; then
 	# calculate the bitrate from the video file properties
 	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoF) / 1000000) + 11) * 37" | bc)
-	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate based out calculation : $BitRateTarget\e[0m"
-	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Bitrate calculated - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation	
+	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget\e[0m"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget" >> $ContLogLocation	
 
 else
 	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget\e[0m"
-	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Bitrate given - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget" >> $ContLogLocation
+fi
+
+# check the bitrate is ok
+# look for a low bitrate
+if [ "$BitRateTarget" -lt $ContBitRateLow ]; then
+	BitRateTarget="$ContBitRateLow"
+	echo -e "\e[44mTarget Bitrate of $BitRateTarget overriden as would be lower than acceptable. Using low bitrate of ${ContBitRateLow}Kbps\e[0m"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Target Bitrate of $BitRateTarget overriden as would be lower than acceptable Using low bitrate of ${ContBitRateLow}Kbps"
+
+# make sure the target is less than the source
+elif	[ $BitRateTarget -gt $BitRateSource ]; then
+	echo -e "\e[44mTarget Bitrate of $BitRateTarget overriden as would be higher than source. Using source bitrate of ${BitRateSource}\e[0m"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Target Bitrate of $BitRateTarget overriden as would be higher than source. Using source bitrate of ${BitRateSource}" >> $ContLogLocation
+	BitRateTarget="$BitRateSource"
 fi
 
 
