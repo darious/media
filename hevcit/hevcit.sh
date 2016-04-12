@@ -224,9 +224,11 @@ while read -r AudioTrack; do
 		1) 	AudioAction="recoded to 128k AAC"
 			AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
 			FileFormat=".mp4"
+			AudioMetaTitle="-metadata:s:a:0= title=\"English AAC 128k\""
 		;;
 		2)	AudioAction="recoded to 128k AAC"
 			AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
+			AudioMetaTitle="-metadata:s:a:0= title=\"English AAC 128k\""
 			FileFormat=".mp4"
 		;;
 		6) 	case "$AudioTrackFormat" in
@@ -285,9 +287,11 @@ while read -r AudioTrack; do
 	
 done <<< "$AudioInfoRaw"
 
-echo -e "\e[44mKeeping audio track $KeepAudioTrackStream ($KeepAudioTrackFormat with $KeepAudioTrackChannels channels in ${KeepAudioTrackSampleRate}Khz at ${KeepAudioTrackBitRate}kbps and it will be $KeepAudioAction\e[0m"
+echo -e "\e[44mKeeping audio track $KeepAudioTrackStream ($KeepAudioTrackFormat with $KeepAudioTrackChannels channels in ${KeepAudioTrackSampleRate}Khz at ${KeepAudioTrackBitRate}kbps) and it will be $KeepAudioAction\e[0m"
 echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping audio track $KeepAudioTrackStream ($KeepAudioTrackFormat with $KeepAudioTrackChannels channels in ${KeepAudioTrackSampleRate}Khz at ${KeepAudioTrackBitRate}kbps and it will be $KeepAudioAction" >> $ContLogLocation
 
+# work out the title of the audio track
+AudioMetaTitle="-metadata:s:a:0= title=\"English ${KeepAudioTrackFormat} ${KeepAudioTrackChannels} Channels, ${KeepAudioTrackSampleRate}Khz at ${KeepAudioTrackBitRate}Kbps\""
 
 # figure out which track is the video and stash the stream number
 VideoInfoRaw=$(ffprobe -i "$InputFileName" 2>&1 | grep -i "Video:")
@@ -307,10 +311,12 @@ while read -r SubTrack; do
 	# should we keep the subtitles?
 	if [ "$SubLang" = "eng" ]; then
 		KeepSubMap="$KeepSubMap -map $SubStream"
+		FileFormat=".mkv"
 		echo -e "\e[44mSubtitle track ${SubStream} is English and will be kept\e[0m"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is in English" >> $ContLogLocation
 	elif [ "$SubLang" = " Su" ]; then
 		KeepSubMap="$KeepSubMap -map $SubStream"
+		FileFormat=".mkv"
 		echo -e "\e[44mSubtitle track ${SubStream} is set to default and will be kept\e[0m"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is set to default language" >> $ContLogLocation
 	fi
@@ -352,11 +358,24 @@ echo -e "\e[44mEncode from $EncodeFile to $TargetFile\e[0m"
 # run ffmpeg with the correct settings we've just calculated
 EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
 
-echo -e "\e[46mffmpeg -i '$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m"
-echo `date +%Y-%m-%d\ %H:%M:%S` "ffmpeg -i '$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m" >> $ContLogLocation
+# create ffmpeg command
+ffmpegCMD=$(echo "'$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$TargetFile'")
+
+uuid=$(uuidgen)
+TempScriptName="/tmp/hevcit_$uuid.sh"
+
+echo "ffmpeg -i $ffmpegCMD" > $TempScriptName
+
+chmod +x "$TempScriptName"
+
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - ffmpeg -i $ffmpegCMD" >> $ContLogLocation	
 
 # do the encode
-ffmpeg -i "$EncodeFile" ${OutputMapping} -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time="$EncodeDate" "$TargetFile"
+#ffmpeg -i "$EncodeFile" ${OutputMapping} -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time="$EncodeDate" ${AudioMetaTitle} ${AudioMetaTitle} "$TargetFile"
+
+"$TempScriptName"
+
+rm "$TempScriptName"
 
 echo -e "\e[44m$InputFileName - Complete\e[0m\n\r"
 echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Complete" >> $ContLogLocation
