@@ -189,7 +189,7 @@ fi
 if [ "$BitRateTarget" -lt $ContBitRateLow ]; then
 	BitRateTarget="$ContBitRateLow"
 	echo -e "\e[44mTarget Bitrate of $BitRateTarget overriden as would be lower than acceptable. Using low bitrate of ${ContBitRateLow}Kbps\e[0m"
-	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Target Bitrate of $BitRateTarget overriden as would be lower than acceptable Using low bitrate of ${ContBitRateLow}Kbps"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Target Bitrate of $BitRateTarget overriden as would be lower than acceptable Using low bitrate of ${ContBitRateLow}Kbps" >> $ContLogLocation
 
 # make sure the target is less than the source
 elif	[ $BitRateTarget -gt $BitRateSource ]; then
