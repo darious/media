@@ -163,51 +163,119 @@ else
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Bitrate given - Source Bitrate : $BitRateSource, Target Bitrate : $BitRateTarget" >> $ContLogLocation
 fi
 
-# work out the audio format in the source file
-AudioFormat=$(mediainfo --inform="Audio;%Format%" "$InputFileName")
-AudioChannels=$(mediainfo --inform="Audio;%Channels%" "$InputFileName")
-AudioBitRate=$(mediainfo --inform="Audio;%BitRate%" "$InputFileName")
-AudioSampleRate=$(mediainfo --inform="Audio;%SamplingRate%" "$InputFileName")
 
-# and what should we do with the audio?
-case "$AudioChannels" in
-	1) 	AudioAction="converted"
-		AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
-		FileFormat=".mp4"
-	;;
-	2) 	AudioAction="converted"
-		AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
-		FileFormat=".mp4"
-	;;
-	6) 	case "$AudioFormat" in
-			AC-3)	if [ "$AudioBitRate" -gt 384000 ]; then
-					AudioAction="recoded to 384k"
+# work out what to do with the audio
+AudioInfoRaw=$(ffprobe -i "$InputFileName" 2>&1 | grep -i "Audio:")
+
+# default this so the comparison works later
+KeepAudioTrackChannels=0
+
+while read -r AudioTrack; do
+	# grab the info we need, format, channels, sample rate and bitrate
+	AudioTrackStream=`echo "$AudioTrack" | cut -c9-11`
+
+	AudioTrackFormat=`echo "$AudioTrack" | grep -io "audio:...."|cut -d ' ' -f2`
+
+	AudioTrackChannels=`echo "$AudioTrack" | cut -d ',' -f3`
+	set -- $AudioTrackChannels
+	AudioTrackChannels=$1
+	# reformat the channels to make it easier later
+	case "$AudioTrackChannels" in
+		mono) AudioTrackChannels=1
+		;;
+		stereo) AudioTrackChannels=2
+		;;
+		"5.1(side)") AudioTrackChannels=6
+		;;
+		*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
+			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
+			exit 0
+		;;
+	esac
+
+	AudioTrackSampleRate=`echo "$AudioTrack" | cut -d ',' -f2`
+	set -- $AudioTrackSampleRate
+	AudioTrackSampleRate=$1
+
+	AudioTrackBitRate=`echo "$AudioTrack" | cut -d ',' -f5`
+	set -- $AudioTrackBitRate
+	AudioTrackBitRate=$1
+
+	echo -e "\e[44mAudio track $AudioTrackStream is $AudioTrackFormat with $AudioTrackChannels channels in ${AudioTrackSampleRate}Khz at ${AudioTrackBitRate}kbps\e[0m"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Audio track $AudioTrackStream is $AudioTrackFormat with $AudioTrackChannels channels in ${AudioTrackSampleRate}Khz at ${AudioTrackBitRate}kbps" >> $ContLogLocation
+	
+	# figure out what to so with this track
+	case "$AudioTrackChannels" in
+		1) 	AudioAction="recoded to 128k AAC "
+			AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
+			FileFormat=".mp4"
+		;;
+		2)	AudioAction="recoded to 128k AAC"
+			AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
+			FileFormat=".mp4"
+		;;
+		6) 	case "$AudioTrackFormat" in
+				ac3)	if [ "$AudioTrackBitRate" -gt 384 ]; then
+						AudioAction="recoded to 384k AC3"
+						AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
+						FileFormat=".mkv"
+					else
+						AudioAction="passed through"
+						AudioConvert="-acodec copy"
+						FileFormat=".mkv"
+					fi
+				;;
+				dts)	AudioAction="recoded to 384k AC3"
 					AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
 					FileFormat=".mkv"
-				else
-					AudioAction="passed through"
-					AudioConvert="-acodec copy"
-					FileFormat=".mkv"
-				fi
-			;;
-			DTS)	AudioAction="recoded to 384k AC3"
-				AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
-				FileFormat=".mkv"
-			;;
-			*) 	echo -e "\e[41mError - Strange audio format. Exiting\e[0m"
-				echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange audio format" >> $ContLogLocation
-				exit 0
-			;;
-		esac
-	;;
-	*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
-		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
-		exit 0
-	;;
-esac
+				;;
+				*) 	echo -e "\e[41mError - Strange audio format. Exiting\e[0m"
+					echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange audio format" >> $ContLogLocation
+					exit 0
+				;;
+			esac
+					
+		;;
+		*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
+			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
+			exit 0
+		;;
+	esac
 
-echo -e "\e[44mSource Audio is $AudioChannels channel $AudioFormat at $AudioBitRate bps & $AudioSampleRate Khz and therefore will be $AudioAction\e[0m"
-echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Audio is $AudioChannels channel $AudioFormat at $AudioBitRate bps & $AudioSampleRate Khz and will be $AudioAction." >> $ContLogLocation
+	# if this is the 1st track then we should keep the values for use
+	if [ "$AudioTrackStream" = 1 ]; then
+		KeepAudioTrackStream=$AudioTrackStream
+		KeepAudioTrackFormat=$AudioTrackFormat
+		KeepAudioTrackChannels=$AudioTrackChannels
+		KeepAudioTrackSampleRate=$AudioTrackSampleRate
+		KeepAudioTrackBitRate=$AudioTrackBitRate
+		KeepAudioAction=$AudioAction
+		KeepAudioConvert=$AudioConvert
+	else
+		# does this track have more channels than the last one? If so then we should keep this one instead
+		if [ "$AudioTrackChannels" -gt "$KeepAudioTrackChannels" ]; then
+			KeepAudioTrackStream=$AudioTrackStream
+			KeepAudioTrackFormat=$AudioTrackFormat
+			KeepAudioTrackChannels=$AudioTrackChannels
+			KeepAudioTrackSampleRate=$AudioTrackSampleRate
+			KeepAudioTrackBitRate=$AudioTrackBitRate
+			KeepAudioAction=$AudioAction
+			KeepAudioConvert=$AudioConvert
+		fi
+	fi
+	
+done <<< "$AudioInfoRaw"
+
+echo -e "\e[44mKeeping audio track $KeepAudioTrackStream ($KeepAudioTrackFormat with $KeepAudioTrackChannels channels in ${KeepAudioTrackSampleRate}Khz at ${KeepAudioTrackBitRate}kbps and it will be $KeepAudioAction\e[0m"
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping audio track $KeepAudioTrackStream ($KeepAudioTrackFormat with $KeepAudioTrackChannels channels in ${KeepAudioTrackSampleRate}Khz at ${KeepAudioTrackBitRate}kbps and it will be $KeepAudioAction" >> $ContLogLocation
+
+
+# figure out which track is the video and stash the stream number
+VideoInfoRaw=$(ffprobe -i "$InputFileName" 2>&1 | grep -i "Video:")
+VideoTrackStream=`echo "$VideoInfoRaw" | cut -c13-15`
+
+# calculate the mapping strings for ffmpeg
+OutputMapping="-map ${VideoTrackStream} -map ${KeepAudioTrackStream}"
 
 
 # backup the current file or change the target name
@@ -241,11 +309,11 @@ echo -e "\e[44mEncode from $EncodeFile to $TargetFile\e[0m"
 # run ffmpeg with the correct settings we've just calculated
 EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
 
-echo -e "\e[46mffmpeg -i '$EncodeFile' -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m"
-echo `date +%Y-%m-%d\ %H:%M:%S` "ffmpeg -i '$EncodeFile' -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m" >> $ContLogLocation
+echo -e "\e[46mffmpeg -i '$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m"
+echo `date +%Y-%m-%d\ %H:%M:%S` "ffmpeg -i '$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m" >> $ContLogLocation
 
 # do the encode
-ffmpeg -i "$EncodeFile" -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time="$EncodeDate" "$TargetFile"
+ffmpeg -i "$EncodeFile" ${OutputMapping} -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time="$EncodeDate" "$TargetFile"
 
 echo -e "\e[44m$InputFileName - Complete\e[0m\n\r"
 echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Complete" >> $ContLogLocation
