@@ -102,6 +102,16 @@ else
 	Resample=" "
 fi
 
+# if the file is 60fps then make it 30fps
+if [ "$VideoF" = 60 ]; then
+	VideoF=30
+	Resample="-r 30"
+	echo -e "\e[44mGot a 60fps file so wil resample to 30fps\e[0m"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is 60fps so will resample to 30fps" >> $ContLogLocation
+else
+	Resample=" "
+fi
+
 # if the video is interlace then add a deinterlace filter to the command
 VideoScan=$(mediainfo --inform="Video;%ScanType%" "$InputFileName")
 if [ "$VideoScan" = "Interlaced" ]; then
@@ -171,6 +181,8 @@ AudioInfoRaw=$(ffprobe -i "$InputFileName" 2>&1 | grep -i "Audio:")
 KeepAudioTrackChannels=0
 
 while read -r AudioTrack; do
+	AudioTrack="$(echo -e "${AudioTrack}" | sed -e 's/^[[:space:]]*//')"
+
 	# grab the info we need, format, channels, sample rate and bitrate
 	AudioTrackStream=`echo "$AudioTrack" | cut -c9-11`
 
@@ -180,12 +192,15 @@ while read -r AudioTrack; do
 	set -- $AudioTrackChannels
 	AudioTrackChannels=$1
 	# reformat the channels to make it easier later
+
 	case "$AudioTrackChannels" in
 		mono) AudioTrackChannels=1
 		;;
 		stereo) AudioTrackChannels=2
 		;;
 		"5.1(side)") AudioTrackChannels=6
+		;;
+		"7.1") AudioTrackChannels=8
 		;;
 		*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
 			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
@@ -206,7 +221,7 @@ while read -r AudioTrack; do
 	
 	# figure out what to so with this track
 	case "$AudioTrackChannels" in
-		1) 	AudioAction="recoded to 128k AAC "
+		1) 	AudioAction="recoded to 128k AAC"
 			AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
 			FileFormat=".mp4"
 		;;
@@ -236,6 +251,10 @@ while read -r AudioTrack; do
 			esac
 					
 		;;
+		8)	AudioAction="passed through"
+			AudioConvert="-acodec copy"
+			FileFormat=".mkv"
+		;;			
 		*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
 			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
 			exit 0
@@ -272,10 +291,34 @@ echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping audio track $KeepAud
 
 # figure out which track is the video and stash the stream number
 VideoInfoRaw=$(ffprobe -i "$InputFileName" 2>&1 | grep -i "Video:")
-VideoTrackStream=`echo "$VideoInfoRaw" | cut -c13-15`
+VideoInfoRaw="$(echo -e "${VideoInfoRaw}" | sed -e 's/^[[:space:]]*//')"
+VideoTrackStream=`echo "$VideoInfoRaw" | cut -c9-11`
+
+
+# work out what subtitles to keep
+SubInfoRaw=$(ffprobe -i "$InputFileName" 2>&1 | grep -i "Subtitle:")
+KeepSubMap=""
+
+while read -r SubTrack; do
+	SubTrack="$(echo -e "${SubTrack}" | sed -e 's/^[[:space:]]*//')"
+	# find the language
+	SubStream=`echo "$SubTrack" | cut -c9-11`
+	SubLang=`echo "$SubTrack" | cut -c13-15`
+	# should we keep the subtitles?
+	if [ "$SubLang" = "eng" ]; then
+		KeepSubMap="$KeepSubMap -map $SubStream"
+		echo -e "\e[44mSubtitle track ${SubStream} is English and will be kept\e[0m"
+		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is in English" >> $ContLogLocation
+	elif [ "$SubLang" = " Su" ]; then
+		KeepSubMap="$KeepSubMap -map $SubStream"
+		echo -e "\e[44mSubtitle track ${SubStream} is set to default and will be kept\e[0m"
+		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is set to default language" >> $ContLogLocation
+	fi
+
+done <<< "$SubInfoRaw"
 
 # calculate the mapping strings for ffmpeg
-OutputMapping="-map ${VideoTrackStream} -map ${KeepAudioTrackStream}"
+OutputMapping="-map ${VideoTrackStream} -map ${KeepAudioTrackStream}${KeepSubMap}"
 
 
 # backup the current file or change the target name
@@ -309,11 +352,11 @@ echo -e "\e[44mEncode from $EncodeFile to $TargetFile\e[0m"
 # run ffmpeg with the correct settings we've just calculated
 EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
 
-echo -e "\e[46mffmpeg -i '$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m"
-echo `date +%Y-%m-%d\ %H:%M:%S` "ffmpeg -i '$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m" >> $ContLogLocation
+echo -e "\e[46mffmpeg -i '$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m"
+echo `date +%Y-%m-%d\ %H:%M:%S` "ffmpeg -i '$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time='$EncodeDate' '$TargetFile'\e[0m" >> $ContLogLocation
 
 # do the encode
-ffmpeg -i "$EncodeFile" ${OutputMapping} -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${AudioConvert} -metadata creation_time="$EncodeDate" "$TargetFile"
+ffmpeg -i "$EncodeFile" ${OutputMapping} -vcodec nvenc_hevc -b:v "${BitRateTarget}"k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time="$EncodeDate" "$TargetFile"
 
 echo -e "\e[44m$InputFileName - Complete\e[0m\n\r"
 echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Complete" >> $ContLogLocation
