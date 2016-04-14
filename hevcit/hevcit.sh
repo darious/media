@@ -109,6 +109,12 @@ case "$VideoF" in
 		echo -e "\e[44mGot a ${VideoF}fps file so wil resample to ${VideoFNew}fps\e[0m"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
+	59.94)
+		VideoFNew=29.97
+		Resample="-r 29.97"
+		echo -e "\e[44mGot a ${VideoF}fps file so wil resample to ${VideoFNew}fps\e[0m"
+		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
+	;;
 	60)
 		VideoFNew=30
 		Resample="-r 30"
@@ -175,7 +181,7 @@ if [ "$ParaBitRate" = "half" ]; then
 
 elif [ "$ParaBitRate" = "calc" ]; then
 	# calculate the bitrate from the video file properties
-	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoF) / 1000000) + 11) * 37" | bc)
+	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoFNew) / 1000000) + 11) * 37" | bc)
 	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget\e[0m"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget" >> $ContLogLocation	
 
@@ -235,6 +241,8 @@ else
 			;;
 			"5.1(side)") AudioTrackChannels=6
 			;;
+			"5.1") AudioTrackChannels=6
+			;;
 			"7.1") AudioTrackChannels=8
 			;;
 			*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
@@ -283,6 +291,11 @@ else
 						AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
 						AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
 						FileFormat=".mkv"
+					;;
+					aac)	AudioAction="recoded to 128k AAC"
+						AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
+						AudioMetaTitle="-metadata:s:a:0= title=\"English AAC 128k\""
+						FileFormat=".mp4"
 					;;
 					*) 	echo -e "\e[41mError - Strange audio format. Exiting\e[0m"
 						echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange audio format" >> $ContLogLocation
@@ -401,7 +414,7 @@ echo -e "\e[44mEncode from $EncodeFile to $TargetFile\e[0m"
 EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
 
 # create ffmpeg command
-ffmpegCMD=$(echo "'$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$TargetFile'")
+ffmpegCMD=$(echo "'$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$TargetFile'")
 
 uuid=$(uuidgen)
 TempScriptName="/tmp/hevcit_$uuid.sh"
