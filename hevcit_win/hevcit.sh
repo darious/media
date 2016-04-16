@@ -353,7 +353,7 @@ fi
 
 
 # figure out which track is the video and stash the stream number
-VideoInfoRaw=$($ffprobeBin -i "$WinInputFile" 2>&1 | grep -i "Video:")
+VideoInfoRaw=$($ffprobeBin -i "$WinInputFile" 2>&1 | grep -i -m 1 "Video:")
 VideoInfoRaw="$(echo -e "${VideoInfoRaw}" | sed -e 's/^[[:space:]]*//')"
 VideoTrackStream=`echo "$VideoInfoRaw" | cut -c9-11`
 
@@ -424,7 +424,7 @@ echo "Encode from $WinEncodeFile to $WinTargetFile"
 EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
 
 # create ffmpeg command
-ffmpegCMD=$(echo "'$WinEncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$WinTargetFile'")
+ffmpegCMD=$(echo "\"$WinEncodeFile\" ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} \"$WinTargetFile\"")
 
 uuid=$(uuidgen)
 TempScriptName="/tmp/hevcit_$uuid.sh"
