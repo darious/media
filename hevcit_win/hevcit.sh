@@ -389,6 +389,9 @@ OutputMapping="-map ${VideoTrackStream} ${KeepAudioTrackStream}${KeepSubMap}"
 # backup the current file or change the target name
 if [ "$ParaFile" = "backup" ]; then
 	BackupFile=`echo "$ContBackupLocation""$xbase"`
+	# remove any quotes from the filename
+	BackupFile=$(echo "$BackupFile" | sed -e 's|["'\'']||g')
+	
 	echo -e "\e[44mBacking up file to $BackupFile\e[0m"
 	mv "$InputFileName" "$BackupFile"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Backup Complete" >> $ContLogLocation		
@@ -410,6 +413,9 @@ else
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Error in backup calculation." >> $ContLogLocation	
 	exit 0	
 fi
+
+# remove any quotes from the filename
+TargetFile=$(echo "$TargetFile" | sed -e 's|["'\'']||g')
 
 
 # as we're on windows we need to fiddle with the file names
