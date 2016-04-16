@@ -26,7 +26,7 @@ conn = lite.connect('music_backlog.db')
 # loop through the entries and add them to the backlog
 for i in d.entries:
 	# clean up some on the name elements
-	album = re.sub("[\(\[].*?[\)\]]", "", i.itms_artist)
+	album = re.sub("[\(\[].*?[\)\]]", "", i.itms_album)
 	album = album.strip()
 
 	# ignore various artists, don't want those
