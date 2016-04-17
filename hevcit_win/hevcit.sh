@@ -14,6 +14,23 @@ convertsecs() {
  printf "%02d:%02d:%02d\n" $h $m $s
 }
 
+# setup the colors
+BLACK=$(tput setaf 0)
+RED=$(tput setaf 1)
+GREEN=$(tput setaf 2)
+YELLOW=$(tput setaf 3)
+LIME_YELLOW=$(tput setaf 190)
+POWDER_BLUE=$(tput setaf 153)
+BLUE=$(tput setaf 4)
+MAGENTA=$(tput setaf 5)
+CYAN=$(tput setaf 6)
+WHITE=$(tput setaf 7)
+BRIGHT=$(tput bold)
+NORMAL=$(tput sgr0)
+BLINK=$(tput blink)
+REVERSE=$(tput smso)
+UNDERLINE=$(tput smul)
+
 # constants
 #ContBackupLocation="/media/stewie/backup/"
 ContBackupLocation="//192.168.0.206/share/backup/"
@@ -27,7 +44,7 @@ InputFileName="$5"
 WinInputFile=`cygpath -w "$InputFileName"`
 
 if [ "$#" -ne 5 ]; then
-	echo -e "\e[41mError wrong number of parameters passed\e[0m"
+	printf '\e[41m%-6s\e[0m\n' "Error wrong number of parameters passed"
 	exit 0
 fi
 
@@ -58,7 +75,7 @@ key="$1"
 				ParaFile="new"
 			;;
 			*)
-				echo -e "\e[41mError : Invalid parameters passed\e[0m"
+				printf '\e[41m%-6s\e[0m\n' "Error : Invalid parameters passed"
 				exit 0
 			;;
 		esac
@@ -78,9 +95,9 @@ xpref=${xbase%.*}
 # check the file exists
 if [ -f "$InputFileName" ]
 then
-	echo -e "\e[44mWorking on : $InputFileName\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "Working on : $InputFileName"
 else
-	echo -e "\e[41m$InputFileName not found. Exiting\e[0m"
+	printf '\e[41m%-6s\e[0m\n' "$InputFileName not found. Exiting"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - File not found" >> $ContLogLocation
 	exit 0
 fi
@@ -89,7 +106,7 @@ fi
 VideoSource=$(mediainfo --inform="Video;%Format%" "$InputFileName")
 
 if [ "$VideoSource" = "HEVC" ]; then
-	echo -e "\e[41mVideo is already HEVC. Exiting\e[0m"
+	printf '\e[41m%-6s\e[0m\n' "Video is already HEVC. Exiting"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Video is already HEVC" >> $ContLogLocation
 	exit 0
 fi
@@ -102,7 +119,7 @@ VideoD=$(mediainfo --inform="General;%Duration%" "$InputFileName")
 VideoD=$((VideoD / 1000))
 VideoDT=$(convertsecs $VideoD)
 
-echo -e "\e[44mVideo is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoDT in length\e[0m"
+printf '\e[44m%-6s\e[0m\n' "Video is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoDT in length"
 echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Video is $VideoSource ${VideoW}x${VideoH} at ${VideoF}fps & $VideoDT in length" >> $ContLogLocation
 
 # fiddle with the framerate 
@@ -110,31 +127,31 @@ case "$VideoF" in
 	50)
 		VideoFNew=25
 		Resample="-r 25"
-		echo -e "\e[44mGot a ${VideoF}fps file so wil resample to ${VideoFNew}fps\e[0m"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	59.94)
 		VideoFNew=29.97
 		Resample="-r 29.97"
-		echo -e "\e[44mGot a ${VideoF}fps file so wil resample to ${VideoFNew}fps\e[0m"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	60)
 		VideoFNew=30
 		Resample="-r 30"
-		echo -e "\e[44mGot a ${VideoF}fps file so wil resample to ${VideoFNew}fps\e[0m"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	100)
 		VideoFNew=25
 		Resample="-r 25"
-		echo -e "\e[44mGot a ${VideoF}fps file so wil resample to ${VideoFNew}fps\e[0m"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	24.97)
 		VideoFNew=25
 		Resample="-r 25"
-		echo -e "\e[44mGot a ${VideoF}fps file so wil resample to ${VideoFNew}fps\e[0m"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	*)
@@ -148,7 +165,7 @@ VideoScan=$(mediainfo --inform="Video;%ScanType%" "$InputFileName")
 if [ "$VideoScan" = "Interlaced" ]; then
 	#Deinterlace='-vf "yadif=0:-1:0"'
 	Deinterlace="-deinterlace"
-	echo -e "\e[44mGot an interlaced file so wil deinterlace\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "Got an interlaced file so wil deinterlace"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is interlaced so will deinterlace" >> $ContLogLocation
 else
 	Deinterlace=""
@@ -161,12 +178,15 @@ BitRateSource=$((BitRateSource / 1000))
 
 # deal with a 0 bitrate
 if [ "$BitRateSource" = 0 ]; then
-	# extract the video	
+	# extract the video
 	TempVideoFile=`echo "/tmp/$xpref.h264"`
-	echo -e "\e[44mGot a 0 BitRate so extracting Video to $TempVideoFile\e[0m"
+	TempVideoFile=`cygpath -w "$TempVideoFile"`
+	printf '\e[44m%-6s\e[0m\n' "Got a 0 BitRate so extracting Video to $TempVideoFile"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Got a 0 BitRate so extracting to temp file" >> $ContLogLocation
 	rm "$TempVideoFile"
-	echo -e "\e[46m$ffmpegBin -i '$InputFileName' -vcodec copy -an '$TempVideoFile'\e[0m"
+	printf '\e[46m\e[30m%-6s\e[0m\n' "$ffmpegBin -i '$InputFileName' -vcodec copy -an $TempVideoFile"
+
+	# run the command
 	$ffmpegBin -i "$InputFileName" -vcodec copy -an "$TempVideoFile"
 
 	# get the new file size and work out the bitrate from it
@@ -180,17 +200,17 @@ fi
 if [ "$ParaBitRate" = "half" ]; then
 	# Calculate the target bit rate as the 1/2 the source 
 	BitRateTarget=$((BitRateSource / 2))
-	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate will be 1/2 that : $BitRateTarget\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate will be 1/2 that : $BitRateTarget"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate will be 1/2 that : $BitRateTarget"  >> $ContLogLocation
 
 elif [ "$ParaBitRate" = "calc" ]; then
 	# calculate the bitrate from the video file properties
 	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoFNew) / 1000000) + 11) * 37" | bc)
-	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget" >> $ContLogLocation	
 
 else
-	echo -e "\e[44mSource $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget" >> $ContLogLocation
 fi
 
@@ -198,12 +218,12 @@ fi
 # look for a low bitrate
 if [ "$BitRateTarget" -lt $ContBitRateLow ]; then
 	BitRateTarget="$ContBitRateLow"
-	echo -e "\e[44mTarget Bitrate of $BitRateTarget overriden as would be lower than acceptable. Using low bitrate of ${ContBitRateLow}Kbps\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "Target Bitrate of $BitRateTarget overriden as would be lower than acceptable. Using low bitrate of ${ContBitRateLow}Kbps"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Target Bitrate of $BitRateTarget overriden as would be lower than acceptable Using low bitrate of ${ContBitRateLow}Kbps" >> $ContLogLocation
 
 # make sure the target is less than the source
 elif	[ $BitRateTarget -gt $BitRateSource ]; then
-	echo -e "\e[44mTarget Bitrate of $BitRateTarget overriden as would be higher than source. Using source bitrate of ${BitRateSource}\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "Target Bitrate of $BitRateTarget overriden as would be higher than source. Using source bitrate of ${BitRateSource}"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Target Bitrate of $BitRateTarget overriden as would be higher than source. Using source bitrate of ${BitRateSource}" >> $ContLogLocation
 	BitRateTarget="$BitRateSource"
 fi
@@ -213,7 +233,7 @@ fi
 AudioInfoRaw=$($ffprobeBin -i "$WinInputFile" 2>&1 | grep -i "Audio:")
 
 if [ "$AudioInfoRaw" = "" ]; then
-	echo -e "\e[44mNo Audio in source file so no audio will be added to target\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "No Audio in source file so no audio will be added to target"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - No Audio in source file so no audio will be added to target" >> $ContLogLocation
 
 	KeepAudioAction="No audio"
@@ -249,7 +269,7 @@ else
 			;;
 			"7.1") AudioTrackChannels=8
 			;;
-			*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
+			*) 	printf '\e[41m%-6s\e[0m\n' "Strange number of audio channels. Exiting"
 				echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
 				exit 0
 			;;
@@ -263,7 +283,7 @@ else
 		set -- $AudioTrackBitRate
 		AudioTrackBitRate=$1
 
-		echo -e "\e[44mAudio track $AudioTrackStream is $AudioTrackFormat with $AudioTrackChannels channels in ${AudioTrackSampleRate}Khz at ${AudioTrackBitRate}kbps\e[0m"
+		printf '\e[44m%-6s\e[0m\n' "Audio track $AudioTrackStream is $AudioTrackFormat with $AudioTrackChannels channels in ${AudioTrackSampleRate}Khz at ${AudioTrackBitRate}kbps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Audio track $AudioTrackStream is $AudioTrackFormat with $AudioTrackChannels channels in ${AudioTrackSampleRate}Khz at ${AudioTrackBitRate}kbps" >> $ContLogLocation
 	
 		# figure out what to so with this track
@@ -301,7 +321,7 @@ else
 						AudioMetaTitle="-metadata:s:a:0= title=\"English AAC 128k\""
 						FileFormat=".mp4"
 					;;
-					*) 	echo -e "\e[41mError - Strange audio format. Exiting\e[0m"
+					*) 	printf '\e[41m%-6s\e[0m\n' "Error - Strange audio format. Exiting"
 						echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange audio format" >> $ContLogLocation
 						exit 0
 					;;
@@ -313,7 +333,7 @@ else
 				AudioMetaTitle="-metadata:s:a:0= title=\"English ${KeepAudioTrackFormat} ${KeepAudioTrackBitRate}k\""
 				FileFormat=".mkv"
 			;;			
-			*) 	echo -e "\e[41mStrange number of audio channels. Exiting\e[0m"
+			*) 	printf '\e[41m%-6s\e[0m\n' "Strange number of audio channels. Exiting"
 				echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
 				exit 0
 			;;
@@ -343,7 +363,7 @@ else
 	
 	done <<< "$AudioInfoRaw"
 
-	echo -e "\e[44mKeeping audio track $KeepAudioTrackStream ($KeepAudioTrackFormat with $KeepAudioTrackChannels channels in ${KeepAudioTrackSampleRate}Khz at ${KeepAudioTrackBitRate}kbps) and it will be $KeepAudioAction\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "Keeping audio track $KeepAudioTrackStream ($KeepAudioTrackFormat with $KeepAudioTrackChannels channels in ${KeepAudioTrackSampleRate}Khz at ${KeepAudioTrackBitRate}kbps) and it will be $KeepAudioAction"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping audio track $KeepAudioTrackStream ($KeepAudioTrackFormat with $KeepAudioTrackChannels channels in ${KeepAudioTrackSampleRate}Khz at ${KeepAudioTrackBitRate}kbps and it will be $KeepAudioAction" >> $ContLogLocation
 
 	KeepAudioTrackStream="-map $KeepAudioTrackStream"
@@ -371,12 +391,12 @@ while read -r SubTrack; do
 	if [ "$SubLang" = "eng" ]; then
 		KeepSubMap="$KeepSubMap -map $SubStream"
 		FileFormat=".mkv"
-		echo -e "\e[44mSubtitle track ${SubStream} is English and will be kept\e[0m"
+		printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is English and will be kept"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is in English" >> $ContLogLocation
 	elif [ "$SubLang" = " Su" ]; then
 		KeepSubMap="$KeepSubMap -map $SubStream"
 		FileFormat=".mkv"
-		echo -e "\e[44mSubtitle track ${SubStream} is set to default and will be kept\e[0m"
+		eprintf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is set to default and will be kept"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is set to default language" >> $ContLogLocation
 	fi
 
@@ -392,7 +412,7 @@ if [ "$ParaFile" = "backup" ]; then
 	# remove any quotes from the filename
 	BackupFile=$(echo "$BackupFile" | sed -e 's|["'\'']||g')
 	
-	echo -e "\e[44mBacking up file to $BackupFile\e[0m"
+	printf '\e[44m%-6s\e[0m\n' "Backing up file to $BackupFile"
 	mv "$InputFileName" "$BackupFile"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Backup Complete" >> $ContLogLocation		
 
@@ -409,7 +429,7 @@ elif [ "$ParaFile" = "new" ]; then
 	EncodeFile=`echo "$InputFileName"`
 	TargetFile=`echo "$xpath/$xpref$FileNew$FileFormat"`
 else
-	echo -e "\e[41mError in backup calculation - Exiting\e[0m"
+	printf '\e[41m%-6s\e[0m\n' "Error in backup calculation - Exiting"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Error in backup calculation." >> $ContLogLocation	
 	exit 0	
 fi
@@ -423,8 +443,7 @@ WinEncodeFile=`cygpath -w "$EncodeFile"`
 WinTargetFile=`cygpath -w "$TargetFile"`
 
 # Encode the file
-echo -e "\e[44m"
-echo "Encode from $WinEncodeFile to $WinTargetFile"
+printf '\e[44m%-6s\e[0m\n' "Encode from $WinEncodeFile to $WinTargetFile"
 
 # run ffmpeg with the correct settings we've just calculated
 EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
@@ -439,10 +458,7 @@ echo "$ffmpegBin -i $ffmpegCMD" > $TempScriptName
 
 ffcmd=`cat $TempScriptName`
 
-#echo -e "\e[46m$ffmpegBin -i $ffmpegCMD\e[0m"
-echo -e "\e[46m\e[30m"
-echo $ffcmd
-echo -e "\e[0m"
+printf '\e[46m\e[30m%-6s\e[0m\n' "$ffcmd"
 
 chmod +x "$TempScriptName"
 
@@ -453,7 +469,8 @@ echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - $ffmpegBin -i $ffmpegCMD" >>
 
 rm "$TempScriptName"
 
-echo -e "\e[44m$InputFileName - Complete\e[0m\n\r"
+printf '\e[44m%-6s\e[0m\n' "$InputFileName - Complete"
+echo -e "\n\r"
 echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Complete" >> $ContLogLocation
 
 exit 0
