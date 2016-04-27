@@ -187,7 +187,7 @@ if [ "$BitRateSource" = 0 ]; then
 	printf '\e[46m\e[30m%-6s\e[0m\n' "$ffmpegBin -i '$InputFileName' -vcodec copy -an $TempVideoFile"
 
 	# run the command
-	$ffmpegBin -i "$InputFileName" -vcodec copy -an "$TempVideoFile"
+	$ffmpegBin -i "$WinInputFile" -vcodec copy -an "$TempVideoFile"
 
 	# get the new file size and work out the bitrate from it
 	TempVideoFileSize=$(mediainfo --inform="General;%FileSize%" "$TempVideoFile")
@@ -449,6 +449,7 @@ printf '\e[44m%-6s\e[0m\n' "Encode from $WinEncodeFile to $WinTargetFile"
 EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
 
 # create ffmpeg command
+# -vf scale=-1:720
 ffmpegCMD=$(echo "'$WinEncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$WinTargetFile'")
 
 uuid=$(uuidgen)
