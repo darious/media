@@ -209,6 +209,12 @@ elif [ "$ParaBitRate" = "calc" ]; then
 	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget" >> $ContLogLocation	
 
+elif [ "$ParaBitRate" = "calc2" ]; then
+	# calculate the bitrate from the video file properties
+	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoFNew) / 1000000) + 11) * 80" | bc)
+	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget" >> $ContLogLocation	
+	
 else
 	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget" >> $ContLogLocation
@@ -217,9 +223,9 @@ fi
 # check the bitrate is ok
 # look for a low bitrate
 if [ "$BitRateTarget" -lt $ContBitRateLow ]; then
-	BitRateTarget="$ContBitRateLow"
 	printf '\e[44m%-6s\e[0m\n' "Target Bitrate of $BitRateTarget overriden as would be lower than acceptable. Using low bitrate of ${ContBitRateLow}Kbps"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Target Bitrate of $BitRateTarget overriden as would be lower than acceptable Using low bitrate of ${ContBitRateLow}Kbps" >> $ContLogLocation
+	BitRateTarget="$ContBitRateLow"
 
 # make sure the target is less than the source
 elif	[ $BitRateTarget -gt $BitRateSource ]; then
