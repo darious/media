@@ -57,6 +57,9 @@ key="$1"
 			calc)
 				ParaBitRate="calc"
 			;;
+			calc2)
+				ParaBitRate="calc2"
+			;;
 			half)
 				ParaBitRate="half"
 			;;
@@ -211,7 +214,7 @@ elif [ "$ParaBitRate" = "calc" ]; then
 
 elif [ "$ParaBitRate" = "calc2" ]; then
 	# calculate the bitrate from the video file properties
-	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoFNew) / 1000000) + 11) * 80" | bc)
+	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoFNew) / 1000000) + 11) * 83" | bc)
 	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget" >> $ContLogLocation	
 	
@@ -322,6 +325,11 @@ else
 						AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
 						FileFormat=".mkv"
 					;;
+					fla)	AudioAction="recoded to 384k AC3"
+						AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
+						AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
+						FileFormat=".mkv"
+					;;
 					aac)	AudioAction="recoded to 128k AAC"
 						AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
 						AudioMetaTitle="-metadata:s:a:0= title=\"English AAC 128k\""
@@ -402,7 +410,7 @@ while read -r SubTrack; do
 	elif [ "$SubLang" = " Su" ]; then
 		KeepSubMap="$KeepSubMap -map $SubStream"
 		FileFormat=".mkv"
-		eprintf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is set to default and will be kept"
+		printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is set to default and will be kept"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is set to default language" >> $ContLogLocation
 	fi
 
