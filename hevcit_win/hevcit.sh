@@ -60,6 +60,9 @@ key="$1"
 			calc2)
 				ParaBitRate="calc2"
 			;;
+			rescale)
+				ParaBitRate="rescale"
+			;;
 			half)
 				ParaBitRate="half"
 			;;
@@ -160,8 +163,22 @@ case "$VideoF" in
 	*)
 		VideoFNew=$VideoF
 	;;
-esac 
+esac
 
+# should we rescale
+if [ "$ParaBitRate" = "rescale" ]; then
+	# calculate the size
+	VideoWNew="1280"
+	VideoHNew=$(echo "(1280 * $VideoH) / $VideoW" | bc)
+	printf '\e[44m%-6s\e[0m\n' "Rescaling from ${VideoW}x${VideoH} to 1280x${VideoHNew}"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Rescaling from ${VideoW}x${VideoH} 1280x${VideoHNew}" >> $ContLogLocation
+	Resample=$Resample" -vf scale=-1280:1"
+	
+	# rest the sizes for the bitrate calc later
+	VideoH=$VideoHNew
+	VideoW=$VideoWNew
+	ParaBitRate="calc"
+fi
 
 # if the video is interlace then add a deinterlace filter to the command
 VideoScan=$(mediainfo --inform="Video;%ScanType%" "$InputFileName")
@@ -198,6 +215,7 @@ if [ "$BitRateSource" = 0 ]; then
 	BitRateSource=$(((TempVideoFileSize / VideoD) * 8))
 	rm "$TempVideoFile"
 fi
+
 
 # workout the target bitrate
 if [ "$ParaBitRate" = "half" ]; then
