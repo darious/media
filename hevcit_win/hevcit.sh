@@ -172,7 +172,7 @@ if [ "$ParaBitRate" = "rescale" ]; then
 	VideoHNew=$(echo "(1280 * $VideoH) / $VideoW" | bc)
 	printf '\e[44m%-6s\e[0m\n' "Rescaling from ${VideoW}x${VideoH} to 1280x${VideoHNew}"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Rescaling from ${VideoW}x${VideoH} 1280x${VideoHNew}" >> $ContLogLocation
-	Resample=$Resample" -vf scale=-1280:1"
+	Resample=$Resample" -vf scale=1280:${VideoHNew}"
 	
 	# rest the sizes for the bitrate calc later
 	VideoH=$VideoHNew
