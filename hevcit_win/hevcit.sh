@@ -421,11 +421,13 @@ while read -r SubTrack; do
 	SubLang=`echo "$SubTrack" | cut -c13-15`
 	# should we keep the subtitles?
 	if [ "$SubLang" = "eng" ]; then
+		KeepSubMap=" -scodec srt "
 		KeepSubMap="$KeepSubMap -map $SubStream"
 		FileFormat=".mkv"
 		printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is English and will be kept"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is in English" >> $ContLogLocation
 	elif [ "$SubLang" = " Su" ]; then
+		KeepSubMap=" -scodec srt "
 		KeepSubMap="$KeepSubMap -map $SubStream"
 		FileFormat=".mkv"
 		printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is set to default and will be kept"
