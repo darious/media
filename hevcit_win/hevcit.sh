@@ -6,6 +6,12 @@
 # -b|--bitrate		: Calulate the bitrate, default is to 1/2 the size
 # -f|--fileformat 	: Skip the backup, appends _new to the end of the filename instead
 
+# dependencies
+# ffmpeg build with nvenc and libfaac support
+# git
+# mediainfo
+# bc
+
 
 convertsecs() {
  ((h=${1}/3600))
