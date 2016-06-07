@@ -40,7 +40,7 @@ UNDERLINE=$(tput smul)
 # constants
 #ContBackupLocation="/media/stewie/backup/"
 ContBackupLocation="//192.168.0.206/share/backup/"
-ContLogLocation="/cygdrive/c/Users/Chris/bin/hevcit/hevcit.log"
+ContLogLocation="/cygdrive/c/Users/Chris/bin/hevcit.log"
 ContBitRateLow=500
 ffmpegBin="ffmpeg_g.exe"
 ffprobeBin="ffprobe_g.exe"
