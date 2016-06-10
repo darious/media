@@ -508,7 +508,7 @@ EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
 
 # create ffmpeg command
 # -vf scale=-1:720
-ffmpegCMD=$(echo "'$EncodeFile' ${OutputMapping} -t 120 -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$TargetFile'")
+ffmpegCMD=$(echo "'$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$TargetFile'")
 
 uuid=$(uuidgen)
 TempScriptName="/tmp/hevcit_$uuid.sh"
