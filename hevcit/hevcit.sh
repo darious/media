@@ -317,7 +317,9 @@ else
 			;;
 			"7.1") AudioTrackChannels=8
 			;;
-			*) 	printf '\e[41m%-6s\e[0m\n' "Strange number of audio channels. Exiting"
+			"2") AudioTrackChannels=2
+			;;
+			*) 	printf '\e[41m%-6s\e[0m\n' "Strange number of audio channels ($AudioTrackChannels). Exiting"
 				echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
 				exit 0
 			;;
