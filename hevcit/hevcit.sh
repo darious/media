@@ -2,9 +2,14 @@
 
 # script to convert input video file into HEVC and AAC/AC3
 # 
-# %1 - Filename
-# -b|--bitrate		: Calulate the bitrate, default is to 1/2 the size
-# -f|--fileformat 	: Skip the backup, appends _new to the end of the filename instead
+# -b		: Calulate the bitrate, allowed values are 	calc	: standard calculation
+#														calc2	: higher bitrate version
+#														half	: half the input bitrate
+# -h	 	: backup or new
+# -a		: Set to pass to passthrough the audio regardless of format
+# -r		: rescale. pass the intager value for the video witdh e.g. 1280 for 720p
+# -f		: filename
+
 
 # dependencies
 # ffmpeg build with nvenc and libfaac support
@@ -47,8 +52,76 @@ ContBitRateLow=500
 ffmpegBin="ffmpeg_g.exe"
 ffprobeBin="ffprobe_g.exe"
 
+while getopts "b:h:a:r:f:" OPTION
+do
+    case $OPTION in
+        b)
+            echo "The value of -b is $OPTARG"
+            option_b=$OPTARG
+            ;;
+        h)
+            echo "The value of -h is $OPTARG"
+            option_h=$OPTARG
+            ;;
+		a)
+            echo "The value of -a is $OPTARG"
+            option_a=$OPTARG
+            ;;
+		r)
+            echo "The value of -r is $OPTARG"
+            option_r=$OPTARG
+            ;;
+		f)
+            echo "The value of -f is $OPTARG"
+            option_f=$OPTARG
+            ;;
+    esac
+done
+
+# translate the input parameters
+# bitrate
+case $option_b in
+	calc)
+		ParaBitRate="calc"
+	;;
+	calc2)
+		ParaBitRate="calc2"
+	;;
+	half)
+		ParaBitRate="half"
+	;;
+	*)
+		BitRateTarget="$2"
+	;;
+esac
+
+# check for an valid combo of parameters
+if [ "$option_r" != "" ] && [ "$ParaBitRate" = "half" ]; then
+	printf '\e[41m%-6s\e[0m\n' "Error : Cannot half the bitrate and rescale"
+	exit 0
+fi
+
+# fileformat
+case $option_h in
+	backup)
+		ParaFile="backup"
+	;;
+	new)
+		ParaFile="new"
+	;;
+	*)
+		printf '\e[41m%-6s\e[0m\n' "Error : Invalid parameters passed"
+		exit 0
+	;;
+esac
+
+printf '\e[44m%-6s\e[0m\n' "Bitrate : $option_b, fileformat : $option_h, Audio : $option_a : $InputFileName"
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Bitrate : $option_h, fileformat : $option_f, Audio : $option_a" >> $ContLogLocation
+
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Starting" >> $ContLogLocation
+
 # pull in our input args
-InputFileName="$5"
+InputFileName="$option_f"
 
 # if we are on windows then we need to know the windows version of the filename as well
 if [[ "$OSTYPE" == "cygwin" ]]; then
@@ -57,56 +130,6 @@ else
 	WinInputFile=$InputFileName
 fi
 
-# check the input string
-if [ "$#" -ne 5 ]; then
-	printf '\e[41m%-6s\e[0m\n' "Error wrong number of parameters passed"
-	exit 0
-fi
-
-while [[ $# > 1 ]]
-do
-key="$1"
-	case $key in
-        	-b | --bitrate)
-		case "$2" in
-			calc)
-				ParaBitRate="calc"
-			;;
-			calc2)
-				ParaBitRate="calc2"
-			;;
-			rescale)
-				ParaBitRate="rescale"
-			;;
-			half)
-				ParaBitRate="half"
-			;;
-			*)
-				BitRateTarget="$2"
-			;;
-		esac
-		shift
-	;;
-        -f | --fileformat)
-		case "$2" in
-			backup)
-				ParaFile="backup"
-			;;
-			new)
-				ParaFile="new"
-			;;
-			*)
-				printf '\e[41m%-6s\e[0m\n' "Error : Invalid parameters passed"
-				exit 0
-			;;
-		esac
-		shift
-	;;
-	esac
-	shift
-done
-
-echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Starting" >> $ContLogLocation
 
 xpath=${InputFileName%/*} 
 xbase=${InputFileName##*/}
@@ -148,51 +171,52 @@ case "$VideoF" in
 	50)
 		VideoFNew=25
 		Resample="-r 25"
-		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so will resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	59.94)
 		VideoFNew=29.97
 		Resample="-r 29.97"
-		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so will resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	60)
 		VideoFNew=30
 		Resample="-r 30"
-		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so will resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	100)
 		VideoFNew=25
 		Resample="-r 25"
-		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so will resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	24.97)
 		VideoFNew=25
 		Resample="-r 25"
-		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so wil resample to ${VideoFNew}fps"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so will resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
 	*)
 		VideoFNew=$VideoF
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so will not change the framerate"
+		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps file so will not change the framerate" >> $ContLogLocation
 	;;
 esac
 
 # should we rescale
-if [ "$ParaBitRate" = "rescale" ]; then
+if [ "$option_r" != "" ]; then
 	# calculate the size
-	VideoWNew="1280"
-	VideoHNew=$(echo "(1280 * $VideoH) / $VideoW" | bc)
-	printf '\e[44m%-6s\e[0m\n' "Rescaling from ${VideoW}x${VideoH} to 1280x${VideoHNew}"
-	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Rescaling from ${VideoW}x${VideoH} 1280x${VideoHNew}" >> $ContLogLocation
-	Resample=$Resample" -vf scale=1280:${VideoHNew}"
+	VideoWNew="$option_r"
+	VideoHNew=$(echo "($VideoWNew * $VideoH) / $VideoW" | bc)
+	printf '\e[44m%-6s\e[0m\n' "Rescaling from ${VideoW}x${VideoH} to ${VideoWNew}x${VideoHNew}"
+	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Rescaling from ${VideoW}x${VideoH} ${VideoWNew}x${VideoHNew}" >> $ContLogLocation
+	Resample=$Resample" -vf scale=${VideoWNew}:${VideoHNew}"
 	
 	# rest the sizes for the bitrate calc later
 	VideoH=$VideoHNew
 	VideoW=$VideoWNew
-	ParaBitRate="calc"
 fi
 
 # if the video is interlace then add a deinterlace filter to the command
@@ -349,7 +373,11 @@ else
 				FileFormat=".mp4"
 			;;
 			6) 	case "$AudioTrackFormat" in
-					ac3)	if [ "$AudioTrackBitRate" -gt 384 ]; then
+					ac3)if [ "option_a" = "pass" ]; then
+							AudioAction="passed through"
+							AudioConvert="-acodec copy"
+							FileFormat=".mkv"
+						elif [ "$AudioTrackBitRate" -gt 384 ]; then
 							AudioAction="recoded to 384k AC3"
 							AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
 							AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
@@ -361,10 +389,16 @@ else
 							FileFormat=".mkv"
 						fi
 					;;
-					dts)	AudioAction="recoded to 384k AC3"
-						AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
-						AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
-						FileFormat=".mkv"
+					dts)	if [ "$option_a" = "pass" ]; then
+								AudioAction="passed through"
+								AudioConvert="-acodec copy"
+								FileFormat=".mkv"
+							else
+								AudioAction="recoded to 384k AC3"
+								AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
+								AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
+								FileFormat=".mkv"
+							fi
 					;;
 					fla)	AudioAction="recoded to 384k AC3"
 						AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
@@ -536,5 +570,3 @@ echo -e "\n\r"
 echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Complete" >> $ContLogLocation
 
 exit 0
-
-
