@@ -56,23 +56,18 @@ while getopts "b:h:a:r:f:" OPTION
 do
     case $OPTION in
         b)
-            echo "The value of -b is $OPTARG"
             option_b=$OPTARG
             ;;
         h)
-            echo "The value of -h is $OPTARG"
             option_h=$OPTARG
             ;;
 		a)
-            echo "The value of -a is $OPTARG"
             option_a=$OPTARG
             ;;
 		r)
-            echo "The value of -r is $OPTARG"
             option_r=$OPTARG
             ;;
 		f)
-            echo "The value of -f is $OPTARG"
             option_f=$OPTARG
             ;;
     esac
@@ -100,6 +95,13 @@ if [ "$option_r" != "" ] && [ "$ParaBitRate" = "half" ]; then
 	printf '\e[41m%-6s\e[0m\n' "Error : Cannot half the bitrate and rescale"
 	exit 0
 fi
+
+# make sure we were given a filename
+if [ "$option_f" = "" ]; then
+	printf '\e[41m%-6s\e[0m\n' "Error : Error no filename provided"
+	exit 0
+fi
+
 
 # fileformat
 case $option_h in
