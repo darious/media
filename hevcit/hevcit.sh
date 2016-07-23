@@ -8,6 +8,7 @@
 # -h	 	: backup or new
 # -a		: Set to pass to passthrough the audio regardless of format
 # -r		: rescale. pass the intager value for the video witdh e.g. 1280 for 720p
+# -t		: run in test mode, if no value supplied then 60 seconds will be encoded
 # -f		: filename
 
 
@@ -52,7 +53,7 @@ ContBitRateLow=500
 ffmpegBin="ffmpeg_g.exe"
 ffprobeBin="ffprobe_g.exe"
 
-while getopts "b:h:a:r:f:" OPTION
+while getopts "b:h:a:r:t:f:" OPTION
 do
     case $OPTION in
         b)
@@ -67,11 +68,17 @@ do
 		r)
             option_r=$OPTARG
             ;;
+		t)
+            option_t=$OPTARG
+			option_t=" -t ${option_t}"
+            ;;
 		f)
             option_f=$OPTARG
             ;;
     esac
 done
+
+echo $option_t
 
 # translate the input parameters
 # bitrate
@@ -117,11 +124,6 @@ case $option_h in
 	;;
 esac
 
-printf '\e[44m%-6s\e[0m\n' "Bitrate : $option_b, fileformat : $option_h, Audio : $option_a : $InputFileName"
-echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Bitrate : $option_h, fileformat : $option_f, Audio : $option_a" >> $ContLogLocation
-
-echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Starting" >> $ContLogLocation
-
 # pull in our input args
 InputFileName="$option_f"
 
@@ -132,6 +134,10 @@ else
 	WinInputFile=$InputFileName
 fi
 
+printf '\e[44m%-6s\e[0m\n' "Bitrate : $option_b, fileformat : $option_h, Audio : $option_a : $InputFileName"
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Bitrate : $option_h, fileformat : $option_f, Audio : $option_a" >> $ContLogLocation
+
+echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Starting" >> $ContLogLocation
 
 xpath=${InputFileName%/*} 
 xbase=${InputFileName##*/}
@@ -179,6 +185,12 @@ case "$VideoF" in
 	59.94)
 		VideoFNew=29.97
 		Resample="-r 29.97"
+		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so will resample to ${VideoFNew}fps"
+		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
+	;;
+	59.88)
+		VideoFNew=29.94
+		Resample="-r 29.94"
 		printf '\e[44m%-6s\e[0m\n' "Got a ${VideoF}fps file so will resample to ${VideoFNew}fps"
 		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - is ${VideoF}fps so will resample to ${VideoFNew}fps" >> $ContLogLocation
 	;;
@@ -375,7 +387,7 @@ else
 				FileFormat=".mp4"
 			;;
 			6) 	case "$AudioTrackFormat" in
-					ac3)if [ "option_a" = "pass" ]; then
+					ac3) if [ "$option_a" = "pass" ]; then
 							AudioAction="passed through"
 							AudioConvert="-acodec copy"
 							FileFormat=".mkv"
@@ -419,10 +431,16 @@ else
 				esac
 					
 			;;
-			8)	AudioAction="passed through"
-				AudioConvert="-acodec copy"
-				AudioMetaTitle="-metadata:s:a:0= title=\"English ${KeepAudioTrackFormat} ${KeepAudioTrackBitRate}k\""
-				FileFormat=".mkv"
+			8)	if [ "$option_a" = "pass" ]; then
+					AudioAction="passed through"
+					AudioConvert="-acodec copy"
+					FileFormat=".mkv"
+				else
+					AudioAction="recoded to 384k AC3"
+					AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
+					AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
+					FileFormat=".mkv"
+				fi
 			;;			
 			*) 	printf '\e[41m%-6s\e[0m\n' "Strange number of audio channels. Exiting"
 				echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange number of audio channels" >> $ContLogLocation
@@ -475,24 +493,29 @@ KeepSubMap=""
 
 while read -r SubTrack; do
 	SubTrack="$(echo -e "${SubTrack}" | sed -e 's/^[[:space:]]*//')"
+	
 	# find the language
 	SubStream=`echo "$SubTrack" | cut -c9-11`
 	SubLang=`echo "$SubTrack" | cut -c13-15`
-	# should we keep the subtitles?
-	if [ "$SubLang" = "eng" ]; then
-		KeepSubMap=" -scodec srt "
-		KeepSubMap="$KeepSubMap -map $SubStream"
-		FileFormat=".mkv"
-		printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is English and will be kept"
-		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is in English" >> $ContLogLocation
-	elif [ "$SubLang" = " Su" ]; then
-		KeepSubMap=" -scodec srt "
-		KeepSubMap="$KeepSubMap -map $SubStream"
-		FileFormat=".mkv"
-		printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is set to default and will be kept"
-		echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is set to default language" >> $ContLogLocation
-	fi
+	SubFormat=`echo "$SubTrack" | cut -c29-33`
 
+	# should we keep the subtitles?
+	if [ "$SubFormat" = "mov_t" ] || [ "$SubFormat" = "ass (" ] || [ "$SubFormat" = "subri" ]; then
+		if [ "$SubLang" = "eng" ]; then
+			KeepSubMap=" -scodec srt "
+			KeepSubMap="$KeepSubMap -map $SubStream"
+			FileFormat=".mkv"
+			printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is English and will be kept"
+			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is in English" >> $ContLogLocation
+		elif [ "$SubLang" = " Su" ]; then
+			KeepSubMap=" -scodec srt "
+			KeepSubMap="$KeepSubMap -map $SubStream"
+			FileFormat=".mkv"
+			printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is set to default and will be kept"
+			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is set to default language" >> $ContLogLocation
+		fi
+	fi
+		
 done <<< "$SubInfoRaw"
 
 # calculate the mapping strings for ffmpeg
@@ -545,8 +568,7 @@ printf '\e[44m%-6s\e[0m\n' "Encode from $EncodeFile to $TargetFile"
 EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
 
 # create ffmpeg command
-# -vf scale=-1:720
-ffmpegCMD=$(echo "'$EncodeFile' ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$TargetFile'")
+ffmpegCMD=$(echo "'$EncodeFile' ${option_t} ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$TargetFile'")
 
 uuid=$(uuidgen)
 TempScriptName="/tmp/hevcit_$uuid.sh"
