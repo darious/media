@@ -403,26 +403,26 @@ else
 							FileFormat=".mkv"
 						fi
 					;;
-					dts)	if [ "$option_a" = "pass" ]; then
-								AudioAction="passed through"
-								AudioConvert="-acodec copy"
-								FileFormat=".mkv"
-							else
-								AudioAction="recoded to 384k AC3"
-								AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
-								AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
-								FileFormat=".mkv"
-							fi
+					dts) if [ "$option_a" = "pass" ]; then
+							AudioAction="passed through"
+							AudioConvert="-acodec copy"
+							FileFormat=".mkv"
+						else
+							AudioAction="recoded to 384k AC3"
+							AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
+							AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
+							FileFormat=".mkv"
+						fi
 					;;
-					fla)	AudioAction="recoded to 384k AC3"
+					fla) AudioAction="recoded to 384k AC3"
 						AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
 						AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
 						FileFormat=".mkv"
 					;;
-					aac)	AudioAction="recoded to 128k AAC"
-						AudioConvert="-acodec libfdk_aac -b:a 128k -ac 2 -ar 48000 -sample_fmt s16"
-						AudioMetaTitle="-metadata:s:a:0= title=\"English AAC 128k\""
-						FileFormat=".mp4"
+					aac) AudioAction="recoded to 384k AC3"
+						AudioConvert="-acodec ac3 -b:a 384k -ar 48000"
+						AudioMetaTitle="-metadata:s:a:0= title=\"English AC3 384k\""
+						FileFormat=".mkv"
 					;;
 					*) 	printf '\e[41m%-6s\e[0m\n' "Error - Strange audio format. Exiting"
 						echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Strange audio format" >> $ContLogLocation
@@ -457,6 +457,8 @@ else
 			KeepAudioTrackBitRate=$AudioTrackBitRate
 			KeepAudioAction=$AudioAction
 			KeepAudioConvert=$AudioConvert
+			KeepFileFormat=$FileFormat
+			KeepAudioMetaTitle=$AudioMetaTitle
 		else
 			# does this track have more channels than the last one? If so then we should keep this one instead
 			if [ "$AudioTrackChannels" -gt "$KeepAudioTrackChannels" ]; then
@@ -467,6 +469,8 @@ else
 				KeepAudioTrackBitRate=$AudioTrackBitRate
 				KeepAudioAction=$AudioAction
 				KeepAudioConvert=$AudioConvert
+				KeepFileFormat=$FileFormat
+				KeepAudioMetaTitle=$AudioMetaTitle
 			fi
 		fi
 	
@@ -504,13 +508,13 @@ while read -r SubTrack; do
 		if [ "$SubLang" = "eng" ]; then
 			KeepSubMap=" -scodec srt "
 			KeepSubMap="$KeepSubMap -map $SubStream"
-			FileFormat=".mkv"
+			KeepFileFormat=".mkv"
 			printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is English and will be kept"
 			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is in English" >> $ContLogLocation
 		elif [ "$SubLang" = " Su" ]; then
 			KeepSubMap=" -scodec srt "
 			KeepSubMap="$KeepSubMap -map $SubStream"
-			FileFormat=".mkv"
+			KeepFileFormat=".mkv"
 			printf '\e[44m%-6s\e[0m\n' "Subtitle track ${SubStream} is set to default and will be kept"
 			echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Keeping subtitle track $SubStream as it is set to default language" >> $ContLogLocation
 		fi
@@ -534,16 +538,16 @@ if [ "$ParaFile" = "backup" ]; then
 
 	# calculate file names
 	if [ "$xpath" = "$xbase" ]; then
-		TargetFile=`echo "$xpref$FileFormat"`	
+		TargetFile=`echo "$xpref$KeepFileFormat"`	
 	else
-		TargetFile=`echo "$xpath/$xpref$FileFormat"`
+		TargetFile=`echo "$xpath/$xpref$KeepFileFormat"`
 	fi
 
 	EncodeFile="$BackupFile"
 elif [ "$ParaFile" = "new" ]; then
 	FileNew="_new"
 	EncodeFile=`echo "$InputFileName"`
-	TargetFile=`echo "$xpath/$xpref$FileNew$FileFormat"`
+	TargetFile=`echo "$xpath/$xpref$FileNew$KeepFileFormat"`
 else
 	printf '\e[41m%-6s\e[0m\n' "Error in backup calculation - Exiting"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Exit - Error in backup calculation." >> $ContLogLocation	
@@ -568,7 +572,7 @@ printf '\e[44m%-6s\e[0m\n' "Encode from $EncodeFile to $TargetFile"
 EncodeDate=$(date +%Y-%m-%d\ %H:%M:%S)
 
 # create ffmpeg command
-ffmpegCMD=$(echo "'$EncodeFile' ${option_t} ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${AudioMetaTitle} '$TargetFile'")
+ffmpegCMD=$(echo "'$EncodeFile' ${option_t} ${OutputMapping} -vcodec nvenc_hevc -b:v ${BitRateTarget}k -maxrate 20000k -preset hq $Resample $Deinterlace ${KeepAudioConvert} -metadata creation_time=\"$EncodeDate\" ${KeepAudioMetaTitle} '$TargetFile'")
 
 uuid=$(uuidgen)
 TempScriptName="/tmp/hevcit_$uuid.sh"
