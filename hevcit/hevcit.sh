@@ -93,7 +93,7 @@ case $option_b in
 		ParaBitRate="half"
 	;;
 	*)
-		BitRateTarget="$2"
+		BitRateTarget=$option_b
 	;;
 esac
 
