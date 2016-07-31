@@ -4,6 +4,7 @@
 # 
 # -b		: Calulate the bitrate, allowed values are 	calc	: standard calculation
 #														calc2	: higher bitrate version
+#														calc3	: Super high bitrate
 #														half	: half the input bitrate
 # -h	 	: backup or new
 # -a		: Set to pass to passthrough the audio regardless of format
@@ -88,6 +89,9 @@ case $option_b in
 	;;
 	calc2)
 		ParaBitRate="calc2"
+	;;
+	calc3)
+		ParaBitRate="calc3"
 	;;
 	half)
 		ParaBitRate="half"
@@ -281,18 +285,23 @@ if [ "$ParaBitRate" = "half" ]; then
 	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate will be 1/2 that : $BitRateTarget"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate will be 1/2 that : $BitRateTarget"  >> $ContLogLocation
 
-elif [ "$ParaBitRate" = "calc" ]; then
+elif [ "$ParaBitRate" = "calc" ] || [ "$ParaBitRate" = "calc2" ] || [ "$ParaBitRate" = "calc3" ]; then
 	# calculate the bitrate from the video file properties
-	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoFNew) / 1000000) + 11) * 37" | bc)
+	case "$ParaBitRate" in
+		calc)
+			Fiddle=37
+		;;
+		calc2)
+			Fiddle=83
+		;;
+		calc3)
+			Fiddle=132
+		;;
+	esac
+		
+	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoFNew) / 1000000) + 11) * $Fiddle" | bc)
 	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget" >> $ContLogLocation	
-
-elif [ "$ParaBitRate" = "calc2" ]; then
-	# calculate the bitrate from the video file properties
-	BitRateTarget=$(echo "((($VideoH * $VideoW * $VideoFNew) / 1000000) + 11) * 83" | bc)
-	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget"
-	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate based on our calculation : $BitRateTarget" >> $ContLogLocation	
-	
 else
 	printf '\e[44m%-6s\e[0m\n' "Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget"
 	echo `date +%Y-%m-%d\ %H:%M:%S` ": $InputFileName - Source $VideoSource video BitRate is : $BitRateSource, the Target BitRate given is : $BitRateTarget" >> $ContLogLocation
@@ -325,7 +334,7 @@ if [ "$AudioInfoRaw" = "" ]; then
 	KeepAudioAction="No audio"
 	KeepAudioConvert="-acodec none"
 	KeepAudioTrackStream=""
-	FileFormat=".mp4"
+	KeepFileFormat=".mp4"
 else
 
 	# default this so the comparison works later
