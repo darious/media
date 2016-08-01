@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 #
 # ----------------------------------------------------- #
 # recode video                                          #
@@ -141,6 +143,52 @@ def ReadInputVariables():
 	return (TargetBitrate, TestDuration, AudioType, fileProcess, VidFileIn)
 
 
+def ZeroBitrate(VidFileIn, TrackID, Type):
+# deal with a 0 bitrate and work out what it is
+	tmpRandom = base64.b64encode(os.urandom(12), '__')
+
+	if os.name in ("posix"):
+	# if in cygwin then convert the filepath format
+		VidFileTemp = posix2win(TmpDir+"zerobitrate%s.mkv" % tmpRandom	)
+	else:
+		VidFileTemp = TmpDir+"zerobitrate%s.mkv" % tmpRandom
+	
+	# create a new file with just this stream
+	if Type == 'V':
+		codec = ['-c:v:'+str(TrackID), 'copy', '-an']
+	if Type == 'A':
+		codec = ['-c:a:0', 'copy', '-vn']
+		
+	ffCommand = ['ffmpeg_g.exe',  '-i',  VidFileIn, '-map', '0:' + str(TrackID)] + codec + [VidFileTemp]
+	
+	# show the command
+	print 'ffmpeg command : %r' % ' '.join(ffCommand)
+
+	# and run it
+	subprocess.call(ffCommand)
+	
+	# read the data
+	media_info = MediaInfo.parse(VidFileTemp)
+
+	for track in media_info.tracks:
+		if track.track_type == 'General':
+			print "Temp bitrate is %s" % (track.overall_bit_rate)
+			if track.overall_bit_rate is not None:
+				tmpBitrate = track.overall_bit_rate
+			else:
+				print "Still 0 Bitrate."
+				sys.exit(2)
+	
+	# drop the temp file
+	try:
+		os.remove(VidFileTemp)
+	except OSError:
+		pass
+		
+	return tmpBitrate
+
+	
+	
 def GetVideoInfo(VidFileIn):
 # get information about the given video file
 	media_info = MediaInfo.parse(VidFileIn)
@@ -150,8 +198,16 @@ def GetVideoInfo(VidFileIn):
 	
 	for track in media_info.tracks:
 		if track.track_type == 'Video':
+			if track.frame_rate_mode == 'VFR':
+				track.frame_rate = 25
+			if track.bit_rate is None:
+				print "Video Got a 0 Bitrate so extracting the data to new file."
+				track.bit_rate = ZeroBitrate(VidFileIn, 0, 'V')
 			VideoInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': round(int(track.bit_rate) / 1000, 0), 'Width': track.width, 'Height': track.height, 'FrameRate': track.frame_rate, 'Duration': track.duration, 'ScanType': track.scan_type })
 		elif track.track_type == 'Audio':
+			if track.bit_rate is None:
+				print "Audio Got a 0 Bitrate so extracting the data to new file."
+				track.bit_rate = ZeroBitrate(VidFileIn, int(track.track_id) - 1, 'A')
 			AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': track.bit_rate, 'Channels': track.channel_s })
 		elif track.track_type == 'Text':
 			SubInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'Language': track.language, 'Default': track.default, 'Forced': track.forced })
@@ -161,6 +217,7 @@ def GetVideoInfo(VidFileIn):
 	
 def BitRateCalc(Width, Height, FrameRate, BitRate):
 # Calculate the bitrate based on the request type
+
 	if TargetBitrate == "calc":
 		NewBitrate = int(round((((int(Width) * int(Height) * float(FrameRate)) / 1000000) + 11) * 37, 0))
 	elif TargetBitrate == "calc2":
@@ -232,7 +289,7 @@ def VideoParameters(VideoInfo):
 	
 	mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 1)]
 	
-	print "Video : %s at %dk new HEVC file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['BitRate'], TargetBitrate, NewBitrate)
+	print "Video : %s at %dk %s long new HEVC file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], TargetBitrate, NewBitrate)
 	
 	return mapping, ffVid
 
@@ -348,7 +405,7 @@ def FileNameCalc(VidFileIn, fileProcess, format):
 	
 # starts here
 # constants
-TmpDir = '/tmp'
+TmpDir = '/tmp/'
 LowBitRate = 500
 BackupLocation = "//192.168.0.206/share/backup/"
 
@@ -405,10 +462,6 @@ VideoInfo, AudioInfo, SubInfo = GetVideoInfo(VidFileInWin)
 # Check work is required
 if VideoInfo[0]['Format'] == 'HEVC':
 	print "Video already in HEVC, nothing to do."
-	#sys.exit(2)
-	
-if VideoInfo[0]['BitRate'] == '0':
-	print "Video Got a 0 Bitrate so dunno what to do."
 	sys.exit(2)
 
 # work out what to do with the Video
