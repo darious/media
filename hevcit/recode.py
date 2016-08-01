@@ -24,6 +24,16 @@ import ntpath
 from subprocess import Popen, PIPE, STDOUT
 import select
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 def copy_large_file(src, dst):
     '''
     Copy a large file showing progress.
@@ -162,7 +172,7 @@ def ZeroBitrate(VidFileIn, TrackID, Type):
 	ffCommand = ['ffmpeg_g.exe',  '-i',  VidFileIn, '-map', '0:' + str(TrackID)] + codec + [VidFileTemp]
 	
 	# show the command
-	print 'ffmpeg command : %r' % ' '.join(ffCommand)
+	print bcolors.OKBLUE + 'ffmpeg command : %r' % ' '.join(ffCommand) + bcolors.ENDC
 
 	# and run it
 	subprocess.call(ffCommand)
@@ -172,11 +182,11 @@ def ZeroBitrate(VidFileIn, TrackID, Type):
 
 	for track in media_info.tracks:
 		if track.track_type == 'General':
-			print "Temp bitrate is %s" % (track.overall_bit_rate)
+			print bcolors.OKBLUE + "Temp bitrate is %s" % (track.overall_bit_rate) + bcolors.ENDC
 			if track.overall_bit_rate is not None:
 				tmpBitrate = track.overall_bit_rate
 			else:
-				print "Still 0 Bitrate."
+				print bcolors.FAIL + "Still 0 Bitrate." + bcolors.ENDC
 				sys.exit(2)
 	
 	# drop the temp file
@@ -201,12 +211,12 @@ def GetVideoInfo(VidFileIn):
 			if track.frame_rate_mode == 'VFR':
 				track.frame_rate = 25
 			if track.bit_rate is None:
-				print "Video Got a 0 Bitrate so extracting the data to new file."
+				print bcolors.WARNING + "Video Got a 0 Bitrate so extracting the data to new file." + bcolors.ENDC
 				track.bit_rate = ZeroBitrate(VidFileIn, 0, 'V')
-			VideoInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': round(int(track.bit_rate) / 1000, 0), 'Width': track.width, 'Height': track.height, 'FrameRate': track.frame_rate, 'Duration': track.duration, 'ScanType': track.scan_type })
+			VideoInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': round(int(track.bit_rate) / 1000, 0), 'Width': track.width, 'Height': track.height, 'FrameRate': track.frame_rate, 'Duration': datetime.timedelta(milliseconds=track.duration), 'ScanType': track.scan_type })
 		elif track.track_type == 'Audio':
 			if track.bit_rate is None:
-				print "Audio Got a 0 Bitrate so extracting the data to new file."
+				print bcolors.WARNING + "Audio Got a 0 Bitrate so extracting the data to new file." + bcolors.ENDC
 				track.bit_rate = ZeroBitrate(VidFileIn, int(track.track_id) - 1, 'A')
 			AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': track.bit_rate, 'Channels': track.channel_s })
 		elif track.track_type == 'Text':
@@ -231,12 +241,12 @@ def BitRateCalc(Width, Height, FrameRate, BitRate):
 	
 	# check the calculated bit is ok
 	if NewBitrate < LowBitRate:
-		print "New Bitrate lower than acceptable so using default low value of %d." % LowBitRate
+		print bcolors.WARNING + "New Bitrate lower than acceptable so using default low value of %d." % LowBitRate + bcolors.ENDC
 		NewBitrate = LowBitRate
 	
 	# check its lower than the source
 	if NewBitrate > BitRate:
-		print "New Bitrate lower than the source so using source bitrate of %d." % BitRate
+		print bcolors.WARNING + "New Bitrate lower than the source so using source bitrate of %d." % BitRate + bcolors.ENDC
 		NewBitrate = BitRate
 		
 	return (NewBitrate)
@@ -263,18 +273,18 @@ def VideoParameters(VideoInfo):
 	
 	if TargetFrameRate <> VideoInfo[0]['FrameRate']:
 		Resample = "-r %d" % TargetFrameRate
-		print "Got a framerate of %s So resampling with %s." % (VideoInfo[0]['FrameRate'], Resample)
+		print bcolors.WARNING + "Got a framerate of %s So resampling with %s." % (VideoInfo[0]['FrameRate'], Resample) + bcolors.ENDC
 	else:
 		Resample = ""
-		print "Got a framerate of %s So no change required" % VideoInfo[0]['FrameRate']
+		print bcolors.WARNING + "Got a framerate of %s So no change required" % VideoInfo[0]['FrameRate'] + bcolors.ENDC
 		
 	# Should we deinterlace?
 	if VideoInfo[0]['ScanType'] == 'Interlaced':
 		Deinterlace = '-deinterlace'
-		print "Got an interlaced file so will deinterlace"
+		print bcolors.WARNING + "Got an interlaced file so will deinterlace" + bcolors.ENDC
 	else:
 		Deinterlace= ''
-		print "Got a progressive file so no change required"
+		print bcolors.WARNING + "Got a progressive file so no change required" + bcolors.ENDC
 	
 	NewBitrate = BitRateCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], TargetFrameRate, VideoInfo[0]['BitRate'])
 	
@@ -289,7 +299,7 @@ def VideoParameters(VideoInfo):
 	
 	mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 1)]
 	
-	print "Video : %s at %dk %s long new HEVC file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], TargetBitrate, NewBitrate)
+	print bcolors.OKGREEN + "Video : %s at %dk %s long new HEVC file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], TargetBitrate, NewBitrate) + bcolors.ENDC
 	
 	return mapping, ffVid
 
@@ -310,7 +320,7 @@ def AudioParameters(AudioInfo):
 			ffAud = ffAud + ['-c:a:'+ str(counter), 'copy']
 			if track['Format'] <> 'AAC':
 				format = 'mkv'
-			print "Audio : Keeping track %s %sk %s, will pass through unchanged" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format'])
+			print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will pass through unchanged" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
 			counter =+ 1
 	
 	if AudioType == "all":
@@ -321,11 +331,11 @@ def AudioParameters(AudioInfo):
 			mapping = mapping + ['-map', '0:' + str(track['ID'] - 1)]
 			if track['Channels'] == 2:
 				ffAud = ffAud + ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), '128k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AAC 128k"']
-				print "Audio : Keeping track %s %sk %s, will recode to 128k AAC" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format'])
+				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 128k AAC" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
 			elif track['Channels'] >= 6:
 				ffAud = ffAud + ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AC3 384k"']
 				format = 'mkv'
-				print "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format'])
+				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
 			counter =+ 1
 	
 	if AudioType == "one":
@@ -337,15 +347,15 @@ def AudioParameters(AudioInfo):
 			if int(track['Channels']) > channels:
 				mapping = ['-map', '0:' + str(track['ID'] - 1)]
 				if track['Channels'] == 2:
-					ffAud + ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), '128k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AAC 128k"']
-					print "Audio : Keeping track %s %sk %s, will recode to 128k AAC" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format'])
+					ffAud = ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), '128k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AAC 128k"']
+					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 128k AAC" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
 				elif track['Channels'] >= 6:
-					ffAud = ffAud + ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AC3 384k"']
+					ffAud = ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AC3 384k"']
 					format = 'mkv'
-					print "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format'])
+					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
 				channels=track['Channels']
 				counter =+ 1
-
+				
 	return (mapping, ffAud, format)
 
 
@@ -356,7 +366,6 @@ def SubParameters(SubInfo):
 	format = 'mp4'
 	
 	for track in SubInfo:
-		#print track['Format'], track['Language'], track['Default'], track['Forced']
 		if track['Language'] == 'en' or track['Default'] == 'Yes' or track['Forced'] == 'Yes':
 		# subtitle is english, default or forced, so we'll keep it
 			mapping = ['-map', '0:' + str(track['ID'] - 1)]
@@ -364,12 +373,12 @@ def SubParameters(SubInfo):
 			# a format we can recode so we will
 				ffSub = ffSub + ['-c:s:'+str(counter), 'ass']
 				format = 'mkv'
-				print "SubTitle : Keeping track %s %s %s, will recode to Advanced SubStation Alpha" % (str(track['ID'] - 1), track['Language'], track['Format'])
+				print bcolors.OKGREEN + "SubTitle : Keeping track %s %s %s, will recode to Advanced SubStation Alpha" % (str(track['ID'] - 1), track['Language'], track['Format']) + bcolors.ENDC
 			if track['Format'] in ("PGS", "VobSub"):
 			# a format we can't code, so we'll just pass it through
 				ffSub = ffSub + ['-c:s:'+str(counter), 'copy']
 				format = 'mkv'
-				print "SubTitle : Keeping track %s %s %s, will be passed through unchanged" % (str(track['ID'] - 1), track['Language'], track['Format'])
+				print bcolors.OKGREEN + "SubTitle : Keeping track %s %s %s, will be passed through unchanged" % (str(track['ID'] - 1), track['Language'], track['Format']) + bcolors.ENDC
 		counter =+ 1
 		
 	return (mapping, ffSub, format)
@@ -386,11 +395,10 @@ def FileNameCalc(VidFileIn, fileProcess, format):
 		except OSError:
 			pass
 			
-		print "backing up file"
-		print VidFileBackup
+		print bcolors.OKBLUE + "backing up file" + bcolors.ENDC
 		copy_large_file(VidFileIn, VidFileBackup)
 		os.remove(VidFileIn)
-		print "backup complete"
+		print bcolors.OKBLUE + "backup complete" + bcolors.ENDC
 		# work out the in and out filenames
 		VidFileOutName, VidFileOutExt = ntpath.splitext(VidFileIn)
 		VidFileOut = VidFileOutName + '.' + format
@@ -436,14 +444,14 @@ TargetBitrate, TestDuration, AudioType, fileProcess, VidFileIn = ReadInputVariab
 # check the TargetBitrate makes sense
 try:
 	TargetBitrate = int(TargetBitrate)
-	print "Numeric bitrate (%d) provided and will be used" % TargetBitrate
+	print bcolors.OKBLUE + "Numeric bitrate (%d) provided and will be used" % TargetBitrate + bcolors.ENDC
 except:
 	if TargetBitrate not in ("calc", "calc2", "calc3", "half"):
-		print "Invalid target bitrate provided (%s) exiting." % TargetBitrate
+		print bcolors.FAIL + "Invalid target bitrate provided (%s) exiting." % TargetBitrate + bcolors.ENDC
 		sys.exit(2)
 
-print "Will encode %s using bitrate %s ,will process the audio as %s and will use a %s file" \
-	% (VidFileIn, TargetBitrate, AudioType, fileProcess)
+print bcolors.OKBLUE + "Will encode %s using bitrate %s ,will process the audio as %s and will use a %s file" \
+	% (VidFileIn, TargetBitrate, AudioType, fileProcess) + bcolors.ENDC
 
 if os.name in ("posix"):
 # if in cygwin then convert the filepath format
@@ -461,7 +469,7 @@ VideoInfo, AudioInfo, SubInfo = GetVideoInfo(VidFileInWin)
 
 # Check work is required
 if VideoInfo[0]['Format'] == 'HEVC':
-	print "Video already in HEVC, nothing to do."
+	print bcolors.FAIL + "Video already in HEVC, nothing to do." + bcolors.ENDC
 	sys.exit(2)
 
 # work out what to do with the Video
@@ -496,7 +504,7 @@ if TestDuration <> "":
 ffCommand = ffCommand + mapping + ffVid + ffAud + ffSub + [VidFileOut]
 
 # show the command
-print 'ffmpeg command : %r' % ' '.join(ffCommand)
+print bcolors.OKBLUE + 'ffmpeg command : %r' % ' '.join(ffCommand) + bcolors.ENDC
 
 # and run it
 subprocess.call(ffCommand)
