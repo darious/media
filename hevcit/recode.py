@@ -117,9 +117,9 @@ def posix2win(path):
 def ReadInputVariables():
 # read in the input arguments
 	try:
-		opts, args = getopt.getopt(sys.argv[1:],"b:t:a:h:f:",["TargetBitrate=","VidFileIn="])
+		opts, args = getopt.getopt(sys.argv[1:],"b:t:a:h:r:f:",["TargetBitrate=","VidFileIn="])
 	except getopt.GetoptError:
-		print 'recode.py -b <Target Bitrate Type> -t <test duration to encode> -a <how to process the audio> -h <new or backup> -f <Input Video File>'
+		print 'recode.py -b <Target Bitrate Type> -t <test duration to encode> -a <how to process the audio> -h <new or backup> -r <width to rescal to, e.g. 1280> -f <Input Video File>'
 		sys.exit(2)
 
 	TargetBitrate=""
@@ -127,6 +127,8 @@ def ReadInputVariables():
 	VidFileIn=""
 	AudioType="one"
 	fileProcess="new"
+	RescaleWidth = None
+	
 	for opt, arg in opts:    
 		if opt in ("-b", "--bitrate"):
 			TargetBitrate = arg
@@ -144,13 +146,16 @@ def ReadInputVariables():
 				
 		if opt in ("-h"):
 			fileProcess = arg
+			
+		if opt in ("-r"):
+			RescaleWidth = arg
 	
 	# check for missing values
 	if TargetBitrate=="" or VidFileIn=="":
 		print 'recode.py -b <Target Bitrate Type> -t <test duration to encode> -f <Input Video File>'
 		sys.exit(2)
 	
-	return (TargetBitrate, TestDuration, AudioType, fileProcess, VidFileIn)
+	return (TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn)
 
 
 def ZeroBitrate(VidFileIn, TrackID, Type):
@@ -208,12 +213,22 @@ def GetVideoInfo(VidFileIn):
 	
 	for track in media_info.tracks:
 		if track.track_type == 'Video':
+			try:
+				tmpBitRate = int(track.bit_rate)
+			except:
+				tmpBitRate = 0
+			
 			if track.frame_rate_mode == 'VFR':
 				track.frame_rate = 25
-			if track.bit_rate is None:
-				print bcolors.WARNING + "Video Got a 0 Bitrate so extracting the data to new file." + bcolors.ENDC
-				track.bit_rate = ZeroBitrate(VidFileIn, 0, 'V')
-			VideoInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': round(int(track.bit_rate) / 1000, 0), 'Width': track.width, 'Height': track.height, 'FrameRate': track.frame_rate, 'Duration': datetime.timedelta(milliseconds=track.duration), 'ScanType': track.scan_type })
+			if (track.bit_rate is None or track.bit_rate == "0" or tmpBitRate == 0):
+				if TargetBitrate <> "pass":
+					print bcolors.WARNING + "Video Got a 0 Bitrate so extracting the data to new file." + bcolors.ENDC
+					track.bit_rate = ZeroBitrate(VidFileIn, 0, 'V')
+				else:
+					track.bit_rate = 10000
+			if track.duration is None:
+				track.duration = 0
+			VideoInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': float(track.bit_rate)/1000, 'Width': track.width, 'Height': track.height, 'FrameRate': track.frame_rate, 'Duration': datetime.timedelta(milliseconds=float(track.duration)), 'ScanType': track.scan_type })
 		elif track.track_type == 'Audio':
 			if track.bit_rate is None:
 				print bcolors.WARNING + "Audio Got a 0 Bitrate so extracting the data to new file." + bcolors.ENDC
@@ -221,7 +236,7 @@ def GetVideoInfo(VidFileIn):
 			AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': track.bit_rate, 'Channels': track.channel_s })
 		elif track.track_type == 'Text':
 			SubInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'Language': track.language, 'Default': track.default, 'Forced': track.forced })
-
+			
 	return (VideoInfo, AudioInfo, SubInfo)
 
 	
@@ -251,55 +266,67 @@ def BitRateCalc(Width, Height, FrameRate, BitRate):
 		
 	return (NewBitrate)
 
+
+def RescaleCalc(Width, Height):
+	NewWidth = RescaleWidth
+	HewHeight = int(round((int(RescaleWidth) * int(Height)) / int(Width), 0))
+	print bcolors.WARNING + "Asked to rescale, will go from %sx%s to %sx%s" % (Width, Height, NewWidth, HewHeight) + bcolors.ENDC
+	return (NewWidth, HewHeight)
+	
 	
 def VideoParameters(VideoInfo):
 # work out all the video encoding parameters
 	
-	# should we change the framerate?
-	if VideoInfo[0]['FrameRate'] == 50:
-		TargetFrameRate = 25
-	elif VideoInfo[0]['FrameRate'] == 59.94:
-		TargetFrameRate = 29.97
-	elif VideoInfo[0]['FrameRate'] == 59.88:
-		TargetFrameRate = 29.94
-	elif VideoInfo[0]['FrameRate'] == 60:
-		TargetFrameRate = 30
-	elif VideoInfo[0]['FrameRate'] == 100:
-		TargetFrameRate = 25
-	elif VideoInfo[0]['FrameRate'] == 24.97:
-		TargetFrameRate = 25
+	# if we've been asked to pass the video through then just do that
+	if TargetBitrate == "pass":
+		ffVid = ['-c:v', 'copy']
+		print bcolors.OKGREEN + "Video : %s at %dbps %s long and will be passed through" % (VideoInfo[0]['Format'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration']) + bcolors.ENDC
 	else:
-		TargetFrameRate = VideoInfo[0]['FrameRate']
-	
-	if TargetFrameRate <> VideoInfo[0]['FrameRate']:
-		Resample = "-r %d" % TargetFrameRate
-		print bcolors.WARNING + "Got a framerate of %s So resampling with %s." % (VideoInfo[0]['FrameRate'], Resample) + bcolors.ENDC
-	else:
-		Resample = ""
-		print bcolors.WARNING + "Got a framerate of %s So no change required" % VideoInfo[0]['FrameRate'] + bcolors.ENDC
+		# should we change the framerate?
+		if VideoInfo[0]['FrameRate'] == 50:
+			TargetFrameRate = 25
+		elif VideoInfo[0]['FrameRate'] == 59.94:
+			TargetFrameRate = 29.97
+		elif VideoInfo[0]['FrameRate'] == 59.88:
+			TargetFrameRate = 29.94
+		elif VideoInfo[0]['FrameRate'] == 60:
+			TargetFrameRate = 30
+		elif VideoInfo[0]['FrameRate'] == 100:
+			TargetFrameRate = 25
+		elif VideoInfo[0]['FrameRate'] == 24.97:
+			TargetFrameRate = 25
+		else:
+			TargetFrameRate = VideoInfo[0]['FrameRate']
 		
-	# Should we deinterlace?
-	if VideoInfo[0]['ScanType'] == 'Interlaced':
-		Deinterlace = '-deinterlace'
-		print bcolors.WARNING + "Got an interlaced file so will deinterlace" + bcolors.ENDC
-	else:
-		Deinterlace= ''
-		print bcolors.WARNING + "Got a progressive file so no change required" + bcolors.ENDC
-	
-	NewBitrate = BitRateCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], TargetFrameRate, VideoInfo[0]['BitRate'])
-	
-	# create the bits of the ffmpeg command for the video
-	ffVid = ['-c:v', 'nvenc_hevc', '-b:v', str(NewBitrate)+'k', '-maxrate', '20000k', '-preset', 'hq']
+		if TargetFrameRate <> VideoInfo[0]['FrameRate']:
+			Resample = "-r %d" % TargetFrameRate
+			print bcolors.WARNING + "Got a framerate of %s So resampling with %s." % (VideoInfo[0]['FrameRate'], Resample) + bcolors.ENDC
+		else:
+			Resample = ""
+			print bcolors.WARNING + "Got a framerate of %s So no change required" % VideoInfo[0]['FrameRate'] + bcolors.ENDC
+			
+		# Should we deinterlace?
+		if VideoInfo[0]['ScanType'] == 'Interlaced':
+			Deinterlace = '-deinterlace'
+			print bcolors.WARNING + "Got an interlaced file so will deinterlace" + bcolors.ENDC
+		else:
+			Deinterlace= ''
+			print bcolors.WARNING + "Got a progressive file so no change required" + bcolors.ENDC
+		
+		NewBitrate = BitRateCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], TargetFrameRate, VideoInfo[0]['BitRate'])
+		
+		# create the bits of the ffmpeg command for the video
+		ffVid = ['-c:v', 'nvenc_hevc', '-b:v', str(NewBitrate)+'k', '-maxrate', '20000k', '-preset', 'hq']
 
-	if Resample <> "":
-		ffVid = ffVid + [Resample]
-	
-	if Deinterlace <> "":
-		ffVid = ffVid + [Deinterlace]
+		if Resample <> "":
+			ffVid = ffVid + [Resample]
+		
+		if Deinterlace <> "":
+			ffVid = ffVid + [Deinterlace]
+		
+		print bcolors.OKGREEN + "Video : %s at %dk %s long new HEVC file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], TargetBitrate, NewBitrate) + bcolors.ENDC
 	
 	mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 1)]
-	
-	print bcolors.OKGREEN + "Video : %s at %dk %s long new HEVC file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], TargetBitrate, NewBitrate) + bcolors.ENDC
 	
 	return mapping, ffVid
 
@@ -320,7 +347,7 @@ def AudioParameters(AudioInfo):
 			ffAud = ffAud + ['-c:a:'+ str(counter), 'copy']
 			if track['Format'] <> 'AAC':
 				format = 'mkv'
-			print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will pass through unchanged" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
+			print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will pass through unchanged" % (str(track['ID'] - 1), track['BitRate'], track['Format']) + bcolors.ENDC
 			counter =+ 1
 	
 	if AudioType == "all":
@@ -331,11 +358,11 @@ def AudioParameters(AudioInfo):
 			mapping = mapping + ['-map', '0:' + str(track['ID'] - 1)]
 			if track['Channels'] == 2:
 				ffAud = ffAud + ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), '128k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AAC 128k"']
-				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 128k AAC" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
+				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 128k AAC" % (str(track['ID'] - 1), track['BitRate'], track['Format']) + bcolors.ENDC
 			elif track['Channels'] >= 6:
 				ffAud = ffAud + ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AC3 384k"']
 				format = 'mkv'
-				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
+				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), track['BitRate'], track['Format']) + bcolors.ENDC
 			counter =+ 1
 	
 	if AudioType == "one":
@@ -348,11 +375,11 @@ def AudioParameters(AudioInfo):
 				mapping = ['-map', '0:' + str(track['ID'] - 1)]
 				if track['Channels'] == 2:
 					ffAud = ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), '128k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AAC 128k"']
-					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 128k AAC" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
+					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 128k AAC" % (str(track['ID'] - 1), track['BitRate'], track['Format']) + bcolors.ENDC
 				elif track['Channels'] >= 6:
 					ffAud = ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AC3 384k"']
 					format = 'mkv'
-					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), int(track['BitRate']) / 1000, track['Format']) + bcolors.ENDC
+					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), track['BitRate'], track['Format']) + bcolors.ENDC
 				channels=track['Channels']
 				counter =+ 1
 				
@@ -366,7 +393,8 @@ def SubParameters(SubInfo):
 	format = 'mp4'
 	
 	for track in SubInfo:
-		if track['Language'] == 'en' or track['Default'] == 'Yes' or track['Forced'] == 'Yes':
+		if track['Language'] == 'en' or track['Forced'] == 'Yes':
+		#or track['Default'] == 'Yes' 
 		# subtitle is english, default or forced, so we'll keep it
 			mapping = ['-map', '0:' + str(track['ID'] - 1)]
 			if track['Format'] in ("ASS", "UTF-8", "SSA"):
@@ -413,7 +441,7 @@ def FileNameCalc(VidFileIn, fileProcess, format):
 	
 # starts here
 # constants
-TmpDir = '/tmp/'
+TmpDir = '/tmp/vidtemp/'
 LowBitRate = 500
 BackupLocation = "//192.168.0.206/share/backup/"
 
@@ -439,15 +467,18 @@ CCP_WIN_A_TO_POSIX = 2
 CCP_WIN_W_TO_POSIX = 3
 
 # get the input values
-TargetBitrate, TestDuration, AudioType, fileProcess, VidFileIn = ReadInputVariables()
+TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn = ReadInputVariables()
 
 # check the TargetBitrate makes sense
 try:
 	TargetBitrate = int(TargetBitrate)
 	print bcolors.OKBLUE + "Numeric bitrate (%d) provided and will be used" % TargetBitrate + bcolors.ENDC
 except:
-	if TargetBitrate not in ("calc", "calc2", "calc3", "half"):
+	if TargetBitrate not in ("calc", "calc2", "calc3", "half", "pass"):
 		print bcolors.FAIL + "Invalid target bitrate provided (%s) exiting." % TargetBitrate + bcolors.ENDC
+		sys.exit(2)
+	if TargetBitrate == 'half' and RescaleWidth <> None:
+		print bcolors.FAIL + "Cannot rescale and half the bitrate." + bcolors.ENDC
 		sys.exit(2)
 
 print bcolors.OKBLUE + "Will encode %s using bitrate %s ,will process the audio as %s and will use a %s file" \
@@ -472,6 +503,14 @@ if VideoInfo[0]['Format'] == 'HEVC':
 	print bcolors.FAIL + "Video already in HEVC, nothing to do." + bcolors.ENDC
 	sys.exit(2)
 
+# have we been asked to rescale
+ffRescale=[]
+if RescaleWidth <> None:
+	NewWidth, NewHeight = RescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'])
+	VideoInfo[0]['Height'] = NewHeight
+	VideoInfo[0]['Width'] = NewWidth
+	ffRescale = ['-vf', 'scale='+str(NewWidth)+':'+str(NewHeight)]
+		
 # work out what to do with the Video
 mapVid, ffVid = VideoParameters(VideoInfo)
 
@@ -501,7 +540,7 @@ DateTimeStr = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H
 ffCommand = ['ffmpeg_g.exe', '-i'] + [VidFileIn]
 if TestDuration <> "":
 	ffCommand = ffCommand + ['-t', TestDuration]
-ffCommand = ffCommand + mapping + ffVid + ffAud + ffSub + [VidFileOut]
+ffCommand = ffCommand + mapping + ffVid + ffRescale + ffAud + ffSub + [VidFileOut]
 
 # show the command
 print bcolors.OKBLUE + 'ffmpeg command : %r' % ' '.join(ffCommand) + bcolors.ENDC
