@@ -348,7 +348,7 @@ def AudioParameters(AudioInfo):
 			if track['Format'] <> 'AAC':
 				format = 'mkv'
 			print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will pass through unchanged" % (str(track['ID'] - 1), track['BitRate'], track['Format']) + bcolors.ENDC
-			counter =+ 1
+			counter += 1
 	
 	if AudioType == "all":
 	# Keep all the tracks but recode to the best formats for each
@@ -363,7 +363,7 @@ def AudioParameters(AudioInfo):
 				ffAud = ffAud + ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000', '-metadata:s:a:'+ str(counter), 'title="English AC3 384k"']
 				format = 'mkv'
 				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), track['BitRate'], track['Format']) + bcolors.ENDC
-			counter =+ 1
+			counter += 1
 	
 	if AudioType == "one":
 	# pick the best track and encode to the best format
@@ -381,7 +381,7 @@ def AudioParameters(AudioInfo):
 					format = 'mkv'
 					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s, will recode to 384k AC3" % (str(track['ID'] - 1), track['BitRate'], track['Format']) + bcolors.ENDC
 				channels=track['Channels']
-				counter =+ 1
+				counter += 1
 				
 	return (mapping, ffAud, format)
 
@@ -407,7 +407,7 @@ def SubParameters(SubInfo):
 				ffSub = ffSub + ['-c:s:'+str(counter), 'copy']
 				format = 'mkv'
 				print bcolors.OKGREEN + "SubTitle : Keeping track %s %s %s, will be passed through unchanged" % (str(track['ID'] - 1), track['Language'], track['Format']) + bcolors.ENDC
-		counter =+ 1
+		counter += 1
 		
 	return (mapping, ffSub, format)
 
