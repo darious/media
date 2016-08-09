@@ -260,7 +260,7 @@ def BitRateCalc(Width, Height, FrameRate, BitRate):
 		NewBitrate = LowBitRate
 	
 	# check its lower than the source
-	if NewBitrate > BitRate:
+	if NewBitrate >= BitRate:
 		print bcolors.WARNING + "New Bitrate lower than the source so using source bitrate of %d." % BitRate + bcolors.ENDC
 		NewBitrate = BitRate
 		
@@ -283,12 +283,15 @@ def VideoParameters(VideoInfo):
 		print bcolors.OKGREEN + "Video : %s at %dbps %s long and will be passed through" % (VideoInfo[0]['Format'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration']) + bcolors.ENDC
 	else:
 		# should we change the framerate?
+		VideoInfo[0]['FrameRate'] = float(VideoInfo[0]['FrameRate'])
 		if VideoInfo[0]['FrameRate'] == 50:
 			TargetFrameRate = 25
 		elif VideoInfo[0]['FrameRate'] == 59.94:
 			TargetFrameRate = 29.97
 		elif VideoInfo[0]['FrameRate'] == 59.88:
 			TargetFrameRate = 29.94
+		elif VideoInfo[0]['FrameRate'] == 59.940:
+			TargetFrameRate = 29.97
 		elif VideoInfo[0]['FrameRate'] == 60:
 			TargetFrameRate = 30
 		elif VideoInfo[0]['FrameRate'] == 100:
@@ -364,7 +367,7 @@ def AudioParameters(AudioInfo):
 	# now figure out what to do with all the tracks
 	if AudioType == "one":
 		mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-1)]
-		if AudioInfo[bestTrack]['Channels'] == 2:
+		if AudioInfo[bestTrack]['Channels'] <= 2:
 			ffAud = ['-c:a:'+ str(bestTrack), 'libfdk_aac', '-b:a:'+ str(bestTrack), '128k', '-ar:'+ str(bestTrack), '48000']
 			print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
 		elif AudioInfo[bestTrack]['Channels'] >= 6:
@@ -438,7 +441,11 @@ def FileNameCalc(VidFileIn, fileProcess, format):
 		# work out the in and out filenames
 		VidFileOutName, VidFileOutExt = ntpath.splitext(VidFileIn)
 		VidFileOut = VidFileOutName + '.' + format
-		VidFileIn = VidFileBackup
+		if os.name in ("posix"):
+		# if in cygwin then convert the filepath format
+			VidFileIn = posix2win(VidFileBackup)
+		else:
+			VidFileIn = VidFileBackup
 		
 	if fileProcess == 'new':
 		VidFileIn = VidFileIn
@@ -536,6 +543,9 @@ else:
 
 # prep the filenames
 VidFileIn, VidFileOut = FileNameCalc (VidFileInWin, fileProcess, format)
+
+print VidFileIn
+print VidFileOut
 
 # calculate all the mappings
 mapping = mapVid + mapAud + mapSub
