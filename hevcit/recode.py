@@ -367,7 +367,7 @@ def AudioParameters(AudioInfo):
 	# now figure out what to do with all the tracks
 	if AudioType == "one":
 		mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-1)]
-		if AudioInfo[bestTrack]['Channels'] <= 2:
+		if AudioInfo[bestTrack]['Channels'] < 6:
 			ffAud = ['-c:a:'+ str(bestTrack), 'libfdk_aac', '-b:a:'+ str(bestTrack), '128k', '-ar:'+ str(bestTrack), '48000']
 			print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
 		elif AudioInfo[bestTrack]['Channels'] >= 6:
@@ -453,7 +453,77 @@ def FileNameCalc(VidFileIn, fileProcess, format):
 		VidFileOut = VidFileOutName + '_new' + '.' + format
 	
 	return (VidFileIn, VidFileOut)
+
+
+def RecodeFile (VidFileIn):
+	print bcolors.OKBLUE + 'Processing File :%s' %(VidFileIn) + bcolors.ENDC
 	
+	if os.name in ("posix"):
+	# if in cygwin then convert the filepath format
+		VidFileInWin = posix2win(VidFileIn)
+	else:
+		VidFileInWin = VidFileIn
+	
+	# get the info all all the tracks in the file
+	VideoInfo, AudioInfo, SubInfo = GetVideoInfo(VidFileInWin)
+
+	# Check work is required
+	if VideoInfo[0]['Format'] == 'HEVC':
+		print bcolors.FAIL + "Video already in HEVC, nothing to do." + bcolors.ENDC
+	else:
+		# have we been asked to rescale
+		ffRescale=[]
+		if RescaleWidth <> None:
+			NewWidth, NewHeight = RescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'])
+			VideoInfo[0]['Height'] = NewHeight
+			VideoInfo[0]['Width'] = NewWidth
+			ffRescale = ['-vf', 'scale='+str(NewWidth)+':'+str(NewHeight)]
+				
+		# work out what to do with the Video
+		mapVid, ffVid = VideoParameters(VideoInfo)
+
+		# work out what to do with the Audio
+		mapAud, ffAud, formatAud = AudioParameters(AudioInfo)
+
+		# work out what to do with the subtitles
+		mapSub, ffSub, formatSub= SubParameters(SubInfo)
+
+		# calculate the fileformat to use
+		if formatAud == 'mkv' or formatSub == 'mkv':
+			format = 'mkv'
+		else:
+			format = 'mp4'
+
+		# prep the filenames
+		VidFileIn, VidFileOut = FileNameCalc (VidFileInWin, fileProcess, format)
+
+		# calculate all the mappings
+		mapping = mapVid + mapAud + mapSub
+
+		# calcualte the metadata timestamp
+		DateTimeStr = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+
+		# create the ffmpeg command
+		ffCommand = ['ffmpeg_g.exe', '-i'] + [VidFileIn]
+		if TestDuration <> "":
+			ffCommand = ffCommand + ['-t', TestDuration]
+		ffCommand = ffCommand + mapping + ffVid + ffRescale + ffAud + ffSub + [VidFileOut]
+
+		# show the command
+		print bcolors.OKBLUE + 'ffmpeg command : %r' % ' '.join(ffCommand) + bcolors.ENDC
+
+		# and run it
+		subprocess.call(ffCommand)
+	
+
+def RecodeFolder (VidFileIn):
+	print bcolors.OKBLUE + 'Processing Folder :%s' %(VidFileIn) + bcolors.ENDC
+	Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(VidFileIn) for f in filenames if os.path.splitext(f)[1] in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv')]
+	Files.sort()
+	for File in Files:
+		RecodeFile(File)
+
+		
 # starts here
 # constants
 TmpDir = '/tmp/vidtemp/'
@@ -499,68 +569,16 @@ except:
 print bcolors.OKBLUE + "Will encode %s using bitrate %s ,will process the audio as %s and will use a %s file" \
 	% (VidFileIn, TargetBitrate, AudioType, fileProcess) + bcolors.ENDC
 
-if os.name in ("posix"):
-# if in cygwin then convert the filepath format
-	VidFileInWin = posix2win(VidFileIn)
+
+	# have we been given a file or a folder
+if os.path.isfile(VidFileIn) == True:
+	RecodeFile(VidFileIn)
+elif os.path.isdir(VidFileIn) == True:
+	RecodeFolder(VidFileIn)
 else:
-	VidFileInWin = VidFileIn
+	print "Error not supplied with a valid file or folder"
+	
 
 
-# check the file exists
 
 
-
-# get the info all all the tracks in the file
-VideoInfo, AudioInfo, SubInfo = GetVideoInfo(VidFileInWin)
-
-# Check work is required
-if VideoInfo[0]['Format'] == 'HEVC':
-	print bcolors.FAIL + "Video already in HEVC, nothing to do." + bcolors.ENDC
-	sys.exit(2)
-
-# have we been asked to rescale
-ffRescale=[]
-if RescaleWidth <> None:
-	NewWidth, NewHeight = RescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'])
-	VideoInfo[0]['Height'] = NewHeight
-	VideoInfo[0]['Width'] = NewWidth
-	ffRescale = ['-vf', 'scale='+str(NewWidth)+':'+str(NewHeight)]
-		
-# work out what to do with the Video
-mapVid, ffVid = VideoParameters(VideoInfo)
-
-# work out what to do with the Audio
-mapAud, ffAud, formatAud = AudioParameters(AudioInfo)
-
-# work out what to do with the subtitles
-mapSub, ffSub, formatSub= SubParameters(SubInfo)
-
-# calculate the fileformat to use
-if formatAud == 'mkv' or formatSub == 'mkv':
-	format = 'mkv'
-else:
-	format = 'mp4'
-
-# prep the filenames
-VidFileIn, VidFileOut = FileNameCalc (VidFileInWin, fileProcess, format)
-
-print VidFileIn
-print VidFileOut
-
-# calculate all the mappings
-mapping = mapVid + mapAud + mapSub
-
-# calcualte the metadata timestamp
-DateTimeStr = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
-
-# create the ffmpeg command
-ffCommand = ['ffmpeg_g.exe', '-i'] + [VidFileIn]
-if TestDuration <> "":
-	ffCommand = ffCommand + ['-t', TestDuration]
-ffCommand = ffCommand + mapping + ffVid + ffRescale + ffAud + ffSub + [VidFileOut]
-
-# show the command
-print bcolors.OKBLUE + 'ffmpeg command : %r' % ' '.join(ffCommand) + bcolors.ENDC
-
-# and run it
-subprocess.call(ffCommand)
