@@ -170,11 +170,11 @@ def ZeroBitrate(VidFileIn, TrackID, Type):
 	
 	# create a new file with just this stream
 	if Type == 'V':
-		codec = ['-c:v:'+str(TrackID), 'copy', '-an']
+		codec = ['-c:v:0', 'copy', '-an']
 	if Type == 'A':
 		codec = ['-c:a:0', 'copy', '-vn']
 		
-	ffCommand = ['ffmpeg_g.exe',  '-i',  VidFileIn, '-map', '0:' + str(TrackID)] + codec + [VidFileTemp]
+	ffCommand = ['ffmpeg_g.exe',  '-i',  VidFileIn] + codec + [VidFileTemp]
 	
 	# show the command
 	print bcolors.OKBLUE + 'ffmpeg command : %r' % ' '.join(ffCommand) + bcolors.ENDC
@@ -302,18 +302,18 @@ def VideoParameters(VideoInfo):
 			TargetFrameRate = VideoInfo[0]['FrameRate']
 		
 		if TargetFrameRate <> VideoInfo[0]['FrameRate']:
-			Resample = "-r %d" % TargetFrameRate
-			print bcolors.WARNING + "Got a framerate of %s So resampling with %s." % (VideoInfo[0]['FrameRate'], Resample) + bcolors.ENDC
+			Resample = ['-r', str(TargetFrameRate)]
+			print bcolors.WARNING + "Got a framerate of %s So resampling with -r %s." % (VideoInfo[0]['FrameRate'], TargetFrameRate) + bcolors.ENDC
 		else:
-			Resample = ""
+			Resample = []
 			print bcolors.WARNING + "Got a framerate of %s So no change required" % VideoInfo[0]['FrameRate'] + bcolors.ENDC
 			
 		# Should we deinterlace?
 		if VideoInfo[0]['ScanType'] == 'Interlaced':
-			Deinterlace = '-deinterlace'
+			Deinterlace = ['-deinterlace']
 			print bcolors.WARNING + "Got an interlaced file so will deinterlace" + bcolors.ENDC
 		else:
-			Deinterlace= ''
+			Deinterlace= []
 			print bcolors.WARNING + "Got a progressive file so no change required" + bcolors.ENDC
 		
 		NewBitrate = BitRateCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], TargetFrameRate, VideoInfo[0]['BitRate'])
@@ -321,11 +321,7 @@ def VideoParameters(VideoInfo):
 		# create the bits of the ffmpeg command for the video
 		ffVid = ['-c:v', 'nvenc_hevc', '-b:v', str(NewBitrate)+'k', '-maxrate', '20000k', '-preset', 'hq']
 
-		if Resample <> "":
-			ffVid = ffVid + [Resample]
-		
-		if Deinterlace <> "":
-			ffVid = ffVid + [Deinterlace]
+		ffVid = ffVid + Resample + Deinterlace
 		
 		print bcolors.OKGREEN + "Video : %s %sx%s at %dk %s long new HEVC file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['Width'], VideoInfo[0]['Height'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], TargetBitrate, NewBitrate) + bcolors.ENDC
 	
@@ -570,7 +566,7 @@ print bcolors.OKBLUE + "Will encode %s using bitrate %s ,will process the audio 
 	% (VidFileIn, TargetBitrate, AudioType, fileProcess) + bcolors.ENDC
 
 
-	# have we been given a file or a folder
+# have we been given a file or a folder
 if os.path.isfile(VidFileIn) == True:
 	RecodeFile(VidFileIn)
 elif os.path.isdir(VidFileIn) == True:
