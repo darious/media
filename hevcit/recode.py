@@ -268,9 +268,14 @@ def BitRateCalc(Width, Height, FrameRate, BitRate):
 
 
 def RescaleCalc(Width, Height):
-	NewWidth = RescaleWidth
-	HewHeight = int(round((int(RescaleWidth) * int(Height)) / int(Width), 0))
-	print bcolors.WARNING + "Asked to rescale, will go from %sx%s to %sx%s" % (Width, Height, NewWidth, HewHeight) + bcolors.ENDC
+	if int(RescaleWidth) < int(Width):
+		NewWidth = RescaleWidth
+		HewHeight = int(round((int(RescaleWidth) * int(Height)) / int(Width), 0))
+		print bcolors.WARNING + "Asked to rescale, will go from %sx%s to %sx%s" % (Width, Height, NewWidth, HewHeight) + bcolors.ENDC
+	else:
+		NewWidth = Width
+		HewHeight = Height
+		print bcolors.WARNING + "Asked to rescale, but New Width of %s is greater than start Width of %s so not changing" % (RescaleWidth, Width) + bcolors.ENDC
 	return (NewWidth, HewHeight)
 	
 	
