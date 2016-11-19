@@ -362,7 +362,6 @@ def AudioParameters(AudioInfo, fileExt):
 	channels=int(AudioInfo[0]['Channels'])
 	
 	for track in AudioInfo:
-		print track['ID']
 		if int(track['Channels']) > channels:
 			bestTrack=track['ID'] - 1
 			counter+=1
@@ -522,8 +521,6 @@ def RecodeFile (VidFileIn):
 
 		# calculate all the mappings
 		mapping = mapVid + mapAud + mapSub
-		
-		print mapping
 
 		# calcualte the metadata timestamp
 		DateTimeStr = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
