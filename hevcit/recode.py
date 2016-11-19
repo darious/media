@@ -279,7 +279,7 @@ def RescaleCalc(Width, Height):
 	return (NewWidth, HewHeight)
 	
 	
-def VideoParameters(VideoInfo):
+def VideoParameters(VideoInfo, fileExt):
 # work out all the video encoding parameters
 	
 	# if we've been asked to pass the video through then just do that
@@ -330,12 +330,15 @@ def VideoParameters(VideoInfo):
 		
 		print bcolors.OKGREEN + "Video : %s %sx%s at %dk %s long new HEVC file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['Width'], VideoInfo[0]['Height'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], TargetBitrate, NewBitrate) + bcolors.ENDC
 	
-	mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 1)]
+	if fileExt == '.avi':
+		mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 0)]
+	else:
+		mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 1)]
 	
 	return mapping, ffVid
 
 
-def AudioParameters(AudioInfo):
+def AudioParameters(AudioInfo, fileExt):
 # work out what to do with the audio
 	ffAud=[]
 	mapping=[]
@@ -359,6 +362,7 @@ def AudioParameters(AudioInfo):
 	channels=int(AudioInfo[0]['Channels'])
 	
 	for track in AudioInfo:
+		print track['ID']
 		if int(track['Channels']) > channels:
 			bestTrack=track['ID'] - 1
 			counter+=1
@@ -367,7 +371,11 @@ def AudioParameters(AudioInfo):
 	
 	# now figure out what to do with all the tracks
 	if AudioType == "one":
-		mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-1)]
+		if fileExt == '.avi':
+			mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-0)]
+		else:
+			mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-1)]
+
 		if AudioInfo[bestTrack]['Channels'] < 6:
 			ffAud = ['-c:a:'+ str(bestTrack), 'libfdk_aac', '-b:a:'+ str(bestTrack), '128k', '-ar:'+ str(bestTrack), '48000']
 			print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
@@ -381,7 +389,11 @@ def AudioParameters(AudioInfo):
 	if AudioType in ("best", "pass", "all"):
 		format = 'mkv'
 		for track in AudioInfo:
-			mapping = mapping + ['-map', '0:' + str(track['ID']-1)]
+			if fileExt == '.avi':
+				mapping = mapping + ['-map', '0:' + str(track['ID']-0)]
+			else:
+				mapping = mapping + ['-map', '0:' + str(track['ID']-1)]
+		
 			if (counter == bestTrack and AudioType == "best") or AudioType == "pass":
 				ffAud = ffAud + ['-c:a:'+ str(counter), 'copy']
 				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s channel %s and passing it through" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
@@ -464,6 +476,9 @@ def RecodeFile (VidFileIn):
 		VidFileInWin = posix2win(VidFileIn)
 	else:
 		VidFileInWin = VidFileIn
+		
+	# stash the file extension
+	fileExt = ntpath.splitext(VidFileInWin)[1]
 	
 	# get the info all all the tracks in the file
 	VideoInfo, AudioInfo, SubInfo = GetVideoInfo(VidFileInWin)
@@ -481,13 +496,20 @@ def RecodeFile (VidFileIn):
 			ffRescale = ['-vf', 'scale='+str(NewWidth)+':'+str(NewHeight)]
 				
 		# work out what to do with the Video
-		mapVid, ffVid = VideoParameters(VideoInfo)
+		mapVid, ffVid = VideoParameters(VideoInfo, fileExt)
 
 		# work out what to do with the Audio
-		mapAud, ffAud, formatAud = AudioParameters(AudioInfo)
+		mapAud, ffAud, formatAud = AudioParameters(AudioInfo, fileExt)
 
 		# work out what to do with the subtitles
-		mapSub, ffSub, formatSub= SubParameters(SubInfo)
+		# if an avi then skip this
+		if fileExt == '.avi':
+			print bcolors.OKBLUE + 'AVI file so skipping subs' + bcolors.ENDC
+			mapSub = []
+			ffSub = []
+			formatSub = []
+		else:		
+			mapSub, ffSub, formatSub= SubParameters(SubInfo)
 
 		# calculate the fileformat to use
 		if formatAud == 'mkv' or formatSub == 'mkv':
@@ -500,6 +522,8 @@ def RecodeFile (VidFileIn):
 
 		# calculate all the mappings
 		mapping = mapVid + mapAud + mapSub
+		
+		print mapping
 
 		# calcualte the metadata timestamp
 		DateTimeStr = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
