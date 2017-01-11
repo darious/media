@@ -210,7 +210,7 @@ def GetVideoInfo(VidFileIn):
 	VideoInfo = []
 	AudioInfo = []
 	SubInfo = []
-	
+
 	for track in media_info.tracks:
 		if track.track_type == 'Video':
 			try:
@@ -345,66 +345,70 @@ def AudioParameters(AudioInfo, fileExt):
 	counter = 0
 	format = 'mp4'
 	
-	# loop through all the audio tracks
-	for track in AudioInfo:
-		# fix the meta data if required
-		if track['Channels'] == '8 / 6':
-			track['Channels'] = 8
-		if track['Channels'] == '7 / 6':
-			track['Channels'] = 7
-		try:
-			track['BitRate']=int(track['BitRate'])
-		except:
-			track['BitRate']=int(384000)
-	
-	# work out which is the best track
-	bestTrack=0
-	channels=int(AudioInfo[0]['Channels'])
-	
-	for track in AudioInfo:
-		if int(track['Channels']) > channels:
-			bestTrack=track['ID'] - 1
-			counter+=1
-
-	print bcolors.OKGREEN + "Audio : Best track is :%s %sk %s channel %s" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
-	
-	# now figure out what to do with all the tracks
-	if AudioType == "one":
-		if fileExt == '.avi':
-			mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-0)]
-		else:
-			mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-1)]
-
-		if AudioInfo[bestTrack]['Channels'] < 6:
-			ffAud = ['-c:a:'+ str(bestTrack), 'libfdk_aac', '-b:a:'+ str(bestTrack), '128k', '-ar:'+ str(bestTrack), '48000']
-			print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
-		elif AudioInfo[bestTrack]['Channels'] >= 6:
-			ffAud = ['-c:a:'+ str(bestTrack), 'ac3', '-b:a:'+ str(bestTrack), '384k', '-ar:'+ str(bestTrack), '48000']
-			format = 'mkv'
-			print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 384k AC3" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
-	
-	# for the others we need to look at all the tracks
-	counter = 0
-	if AudioType in ("best", "pass", "all"):
-		format = 'mkv'
+	if not AudioInfo:
+		# no audo so say so and do nothing
+		print bcolors.OKGREEN + "Audio : No audio tracks found." + bcolors.ENDC
+	else:
+		# loop through all the audio tracks
 		for track in AudioInfo:
-			if fileExt == '.avi':
-				mapping = mapping + ['-map', '0:' + str(track['ID']-0)]
-			else:
-				mapping = mapping + ['-map', '0:' + str(track['ID']-1)]
+			# fix the meta data if required
+			if track['Channels'] == '8 / 6':
+				track['Channels'] = 8
+			if track['Channels'] == '7 / 6':
+				track['Channels'] = 7
+			try:
+				track['BitRate']=int(track['BitRate'])
+			except:
+				track['BitRate']=int(384000)
 		
-			if (counter == bestTrack and AudioType == "best") or AudioType == "pass":
-				ffAud = ffAud + ['-c:a:'+ str(counter), 'copy']
-				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s channel %s and passing it through" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+		# work out which is the best track
+		bestTrack=0
+		channels=int(AudioInfo[0]['Channels'])
+		
+		for track in AudioInfo:
+			if int(track['Channels']) > channels:
+				bestTrack=track['ID'] - 1
+				counter+=1
+
+		print bcolors.OKGREEN + "Audio : Best track is :%s %sk %s channel %s" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+		
+		# now figure out what to do with all the tracks
+		if AudioType == "one":
+			if fileExt == '.avi':
+				mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-0)]
 			else:
-				if track['Channels'] == 2:
-					ffAud = ffAud + ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), '128k', '-ar:'+ str(counter), '48000']
-					print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
-				elif track['Channels'] >= 6:
-					ffAud = ffAud + ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000']
-					format = 'mkv'
-					print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 384k AC3" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
-			counter += 1
+				mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-1)]
+
+			if AudioInfo[bestTrack]['Channels'] < 6:
+				ffAud = ['-c:a:'+ str(bestTrack), 'libfdk_aac', '-b:a:'+ str(bestTrack), '128k', '-ar:'+ str(bestTrack), '48000']
+				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
+			elif AudioInfo[bestTrack]['Channels'] >= 6:
+				ffAud = ['-c:a:'+ str(bestTrack), 'ac3', '-b:a:'+ str(bestTrack), '384k', '-ar:'+ str(bestTrack), '48000']
+				format = 'mkv'
+				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 384k AC3" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
+		
+		# for the others we need to look at all the tracks
+		counter = 0
+		if AudioType in ("best", "pass", "all"):
+			format = 'mkv'
+			for track in AudioInfo:
+				if fileExt == '.avi':
+					mapping = mapping + ['-map', '0:' + str(track['ID']-0)]
+				else:
+					mapping = mapping + ['-map', '0:' + str(track['ID']-1)]
+			
+				if (counter == bestTrack and AudioType == "best") or AudioType == "pass":
+					ffAud = ffAud + ['-c:a:'+ str(counter), 'copy']
+					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s channel %s and passing it through" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+				else:
+					if track['Channels'] == 2:
+						ffAud = ffAud + ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), '128k', '-ar:'+ str(counter), '48000']
+						print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+					elif track['Channels'] >= 6:
+						ffAud = ffAud + ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000']
+						format = 'mkv'
+						print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 384k AC3" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+				counter += 1
 	
 	return (mapping, ffAud, format)
 
@@ -540,8 +544,9 @@ def RecodeFile (VidFileIn):
 
 def RecodeFolder (VidFileIn):
 	print bcolors.OKBLUE + 'Processing Folder :%s' %(VidFileIn) + bcolors.ENDC
-	Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(VidFileIn) for f in filenames if os.path.splitext(f)[1] in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv')]
+	Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(VidFileIn) for f in filenames if os.path.splitext(f)[1] in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg')]
 	Files.sort()
+	#Files.sort(reverse=True)
 	for File in Files:
 		RecodeFile(File)
 
