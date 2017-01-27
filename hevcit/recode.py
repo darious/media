@@ -116,10 +116,13 @@ def posix2win(path):
 	
 def ReadInputVariables():
 # read in the input arguments
+
+	helpstring = 'recode.py -b <Target Bitrate Type> -t <test duration to encode> -a <how to process the audio> -h <new or backup> -r <width to rescal to, e.g. 1280> -o Y <ignore the check that we have already coded> -f <Input Video File>'
+
 	try:
-		opts, args = getopt.getopt(sys.argv[1:],"b:t:a:h:r:f:",["TargetBitrate=","VidFileIn="])
+		opts, args = getopt.getopt(sys.argv[1:],"b:t:a:h:r:f:o:",["TargetBitrate=","VidFileIn="])
 	except getopt.GetoptError:
-		print 'recode.py -b <Target Bitrate Type> -t <test duration to encode> -a <how to process the audio> -h <new or backup> -r <width to rescal to, e.g. 1280> -f <Input Video File>'
+		print helpstring
 		sys.exit(2)
 
 	TargetBitrate=""
@@ -128,6 +131,7 @@ def ReadInputVariables():
 	AudioType="one"
 	fileProcess="new"
 	RescaleWidth = None
+	Override = 'N'
 	
 	for opt, arg in opts:    
 		if opt in ("-b", "--bitrate"):
@@ -141,7 +145,7 @@ def ReadInputVariables():
 			
 		if opt in ("-a", "--audio"):
 			AudioType = arg
-			if AudioType not in ("pass", "all", "one", "best"):
+			if AudioType not in ("pass", "all", "one", "best", "aac"):
 				AudioType = "one"
 				
 		if opt in ("-h"):
@@ -149,13 +153,20 @@ def ReadInputVariables():
 			
 		if opt in ("-r"):
 			RescaleWidth = arg
+			
+		if opt in ("-o"):
+			Override = 'Y'
 	
 	# check for missing values
+	
+	print TargetBitrate
+	print VidFileIn
+	
 	if TargetBitrate=="" or VidFileIn=="":
-		print 'recode.py -b <Target Bitrate Type> -t <test duration to encode> -f <Input Video File>'
+		print helpstring
 		sys.exit(2)
 	
-	return (TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn)
+	return (TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, Override)
 
 
 def ZeroBitrate(VidFileIn, TrackID, Type):
@@ -346,7 +357,7 @@ def AudioParameters(AudioInfo, fileExt):
 	format = 'mp4'
 	
 	if not AudioInfo:
-		# no audo so say so and do nothing
+		# no audio so say so and do nothing
 		print bcolors.OKGREEN + "Audio : No audio tracks found." + bcolors.ENDC
 	else:
 		# loop through all the audio tracks
@@ -373,20 +384,20 @@ def AudioParameters(AudioInfo, fileExt):
 		print bcolors.OKGREEN + "Audio : Best track is :%s %sk %s channel %s" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
 		
 		# now figure out what to do with all the tracks
-		if AudioType == "one":
+		if AudioType in ("one", "aac"):
 			if fileExt == '.avi':
 				mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-0)]
 			else:
 				mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-1)]
 
-			if AudioInfo[bestTrack]['Channels'] < 6:
+			if AudioInfo[bestTrack]['Channels'] < 6 or AudioType == "aac":
 				ffAud = ['-c:a:'+ str(bestTrack), 'libfdk_aac', '-b:a:'+ str(bestTrack), '128k', '-ar:'+ str(bestTrack), '48000']
 				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
 			elif AudioInfo[bestTrack]['Channels'] >= 6:
 				ffAud = ['-c:a:'+ str(bestTrack), 'ac3', '-b:a:'+ str(bestTrack), '384k', '-ar:'+ str(bestTrack), '48000']
 				format = 'mkv'
 				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 384k AC3" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
-		
+	
 		# for the others we need to look at all the tracks
 		counter = 0
 		if AudioType in ("best", "pass", "all"):
@@ -471,7 +482,7 @@ def FileNameCalc(VidFileIn, fileProcess, format):
 	return (VidFileIn, VidFileOut)
 
 
-def RecodeFile (VidFileIn):
+def RecodeFile (VidFileIn, Override):
 	print bcolors.OKBLUE + 'Processing File :%s' %(VidFileIn) + bcolors.ENDC
 	
 	if os.name in ("posix"):
@@ -487,7 +498,7 @@ def RecodeFile (VidFileIn):
 	VideoInfo, AudioInfo, SubInfo = GetVideoInfo(VidFileInWin)
 
 	# Check work is required
-	if VideoInfo[0]['Format'] == 'HEVC':
+	if VideoInfo[0]['Format'] == 'HEVC' and Override == 'N':
 		print bcolors.FAIL + "Video already in HEVC, nothing to do." + bcolors.ENDC
 	else:
 		# have we been asked to rescale
@@ -542,13 +553,13 @@ def RecodeFile (VidFileIn):
 		subprocess.call(ffCommand)
 	
 
-def RecodeFolder (VidFileIn):
+def RecodeFolder (VidFileIn, Override):
 	print bcolors.OKBLUE + 'Processing Folder :%s' %(VidFileIn) + bcolors.ENDC
 	Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(VidFileIn) for f in filenames if os.path.splitext(f)[1] in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg')]
 	Files.sort()
 	#Files.sort(reverse=True)
 	for File in Files:
-		RecodeFile(File)
+		RecodeFile(File, Override)
 
 		
 # starts here
@@ -579,7 +590,7 @@ CCP_WIN_A_TO_POSIX = 2
 CCP_WIN_W_TO_POSIX = 3
 
 # get the input values
-TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn = ReadInputVariables()
+TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, Override = ReadInputVariables()
 
 # check the TargetBitrate makes sense
 try:
@@ -599,13 +610,9 @@ print bcolors.OKBLUE + "Will encode %s using bitrate %s ,will process the audio 
 
 # have we been given a file or a folder
 if os.path.isfile(VidFileIn) == True:
-	RecodeFile(VidFileIn)
+	RecodeFile(VidFileIn, Override)
 elif os.path.isdir(VidFileIn) == True:
-	RecodeFolder(VidFileIn)
+	RecodeFolder(VidFileIn, Override)
 else:
 	print "Error not supplied with a valid file or folder"
 	
-
-
-
-
