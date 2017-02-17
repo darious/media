@@ -131,7 +131,6 @@ def ReadInputVariables():
 	AudioType="one"
 	fileProcess="new"
 	RescaleWidth = None
-	Override = 'N'
 	
 	for opt, arg in opts:    
 		if opt in ("-b", "--bitrate"):
@@ -153,9 +152,6 @@ def ReadInputVariables():
 			
 		if opt in ("-r"):
 			RescaleWidth = arg
-			
-		if opt in ("-o"):
-			Override = 'Y'
 	
 	# check for missing values
 	
@@ -166,7 +162,7 @@ def ReadInputVariables():
 		print helpstring
 		sys.exit(2)
 	
-	return (TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, Override)
+	return (TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn)
 
 
 def ZeroBitrate(VidFileIn, TrackID, Type):
@@ -346,7 +342,7 @@ def VideoParameters(VideoInfo, fileExt):
 	else:
 		mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 1)]
 	
-	return mapping, ffVid
+	return mapping, ffVid, NewBitrate
 
 
 def AudioParameters(AudioInfo, fileExt):
@@ -482,8 +478,11 @@ def FileNameCalc(VidFileIn, fileProcess, format):
 	return (VidFileIn, VidFileOut)
 
 
-def RecodeFile (VidFileIn, Override):
+def RecodeFile (VidFileIn):
 	print bcolors.OKBLUE + 'Processing File :%s' %(VidFileIn) + bcolors.ENDC
+	
+	workreq=0
+	workreas=''
 	
 	if os.name in ("posix"):
 	# if in cygwin then convert the filepath format
@@ -497,24 +496,37 @@ def RecodeFile (VidFileIn, Override):
 	# get the info all all the tracks in the file
 	VideoInfo, AudioInfo, SubInfo = GetVideoInfo(VidFileInWin)
 
-	# Check work is required
-	if VideoInfo[0]['Format'] == 'HEVC' and Override == 'N':
-		print bcolors.FAIL + "Video already in HEVC, nothing to do." + bcolors.ENDC
+	# have we been asked to rescale
+	OldWidth=VideoInfo[0]['Width']
+	ffRescale=[]
+	if RescaleWidth <> None:
+		NewWidth, NewHeight = RescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'])
+		VideoInfo[0]['Height'] = NewHeight
+		VideoInfo[0]['Width'] = NewWidth
+		ffRescale = ['-vf', 'scale='+str(NewWidth)+':'+str(NewHeight)]
 	else:
-		# have we been asked to rescale
-		ffRescale=[]
-		if RescaleWidth <> None:
-			NewWidth, NewHeight = RescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'])
-			VideoInfo[0]['Height'] = NewHeight
-			VideoInfo[0]['Width'] = NewWidth
-			ffRescale = ['-vf', 'scale='+str(NewWidth)+':'+str(NewHeight)]
-				
-		# work out what to do with the Video
-		mapVid, ffVid = VideoParameters(VideoInfo, fileExt)
-
+		NewWidth=VideoInfo[0]['Width']
+	
+	# work out what to do with the Video
+	mapVid, ffVid, NewBitrate = VideoParameters(VideoInfo, fileExt)
+	
+	# Check work is required
+	if VideoInfo[0]['Format'] <> 'HEVC':
+		workreq=1
+		workreas='video is not encoded in HEVC'
+	elif int(NewWidth) < int(OldWidth):
+		workreq=1
+		workreas='video will be recaled to smaller size'
+	elif (NewBitrate / VideoInfo[0]['BitRate']) < 0.93:
+		workreq=1
+		workreas='video will be encoded to a lower bitrate'
+	
+	if workreq==1:
 		# work out what to do with the Audio
 		mapAud, ffAud, formatAud = AudioParameters(AudioInfo, fileExt)
 
+		print bcolors.WARNING + "Recoding as %s" % (workreas) + bcolors.ENDC
+		
 		# work out what to do with the subtitles
 		# if an avi then skip this
 		if fileExt == '.avi':
@@ -551,15 +563,17 @@ def RecodeFile (VidFileIn, Override):
 
 		# and run it
 		subprocess.call(ffCommand)
+	else:
+		print bcolors.FAIL + "No work required" + bcolors.ENDC
 	
 
-def RecodeFolder (VidFileIn, Override):
+def RecodeFolder (VidFileIn):
 	print bcolors.OKBLUE + 'Processing Folder :%s' %(VidFileIn) + bcolors.ENDC
 	Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(VidFileIn) for f in filenames if os.path.splitext(f)[1] in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg')]
 	Files.sort()
 	#Files.sort(reverse=True)
 	for File in Files:
-		RecodeFile(File, Override)
+		RecodeFile(File)
 
 		
 # starts here
@@ -590,7 +604,7 @@ CCP_WIN_A_TO_POSIX = 2
 CCP_WIN_W_TO_POSIX = 3
 
 # get the input values
-TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, Override = ReadInputVariables()
+TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn = ReadInputVariables()
 
 # check the TargetBitrate makes sense
 try:
@@ -610,9 +624,9 @@ print bcolors.OKBLUE + "Will encode %s using bitrate %s ,will process the audio 
 
 # have we been given a file or a folder
 if os.path.isfile(VidFileIn) == True:
-	RecodeFile(VidFileIn, Override)
+	RecodeFile(VidFileIn)
 elif os.path.isdir(VidFileIn) == True:
-	RecodeFolder(VidFileIn, Override)
+	RecodeFolder(VidFileIn)
 else:
 	print "Error not supplied with a valid file or folder"
 	
