@@ -154,10 +154,6 @@ def ReadInputVariables():
 			RescaleWidth = arg
 	
 	# check for missing values
-	
-	print TargetBitrate
-	print VidFileIn
-	
 	if TargetBitrate=="" or VidFileIn=="":
 		print helpstring
 		sys.exit(2)
@@ -580,7 +576,9 @@ def RecodeFolder (VidFileIn):
 # constants
 TmpDir = '/tmp/vidtemp/'
 LowBitRate = 500
-BackupLocation = "//192.168.0.206/share/backup/"
+#BackupLocation = "//192.168.0.206/share/backup/"
+#BackupLocation = "//tank02/download/backup/"
+BackupLocation = "//tank03/backup/video/"
 
 TargetBitrate = ""
 TestDuration = ""
