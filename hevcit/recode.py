@@ -117,10 +117,9 @@ def posix2win(path):
 def ReadInputVariables():
 # read in the input arguments
 
-	helpstring = 'recode.py -b <Target Bitrate Type> -t <test duration to encode> -a <how to process the audio> -h <new or backup> -r <width to rescal to, e.g. 1280> -o Y <ignore the check that we have already coded> -f <Input Video File>'
-
+	helpstring = 'recode.py -b <Target Bitrate Type> -t <test duration to encode> -a <how to process the audio> -h <new or backup> -r <width to rescal to, e.g. 1280> -o Y <ignore the check that we have already coded> -f <Input Video File> -v <Video codec h264 or h265>'
 	try:
-		opts, args = getopt.getopt(sys.argv[1:],"b:t:a:h:r:f:o:",["TargetBitrate=","VidFileIn="])
+		opts, args = getopt.getopt(sys.argv[1:],"b:t:a:h:r:f:o:v:",["TargetBitrate=","VidFileIn="])
 	except getopt.GetoptError:
 		print helpstring
 		sys.exit(2)
@@ -131,6 +130,7 @@ def ReadInputVariables():
 	AudioType="one"
 	fileProcess="new"
 	RescaleWidth = None
+	VideoCodec = "h265"
 	
 	for opt, arg in opts:    
 		if opt in ("-b", "--bitrate"):
@@ -152,13 +152,18 @@ def ReadInputVariables():
 			
 		if opt in ("-r"):
 			RescaleWidth = arg
+
+		if opt in ("-v"):
+			VideoCodec = arg
+			if VideoCodec not in ("h264", "h265"):
+				VideoCodec = "h265"
 	
 	# check for missing values
 	if TargetBitrate=="" or VidFileIn=="":
 		print helpstring
 		sys.exit(2)
 	
-	return (TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn)
+	return (TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, VideoCodec)
 
 
 def ZeroBitrate(VidFileIn, TrackID, Type):
@@ -243,7 +248,7 @@ def GetVideoInfo(VidFileIn):
 	return (VideoInfo, AudioInfo, SubInfo)
 
 	
-def BitRateCalc(Width, Height, FrameRate, BitRate):
+def BitRateCalc(Width, Height, FrameRate, BitRate, VideoCodec):
 # Calculate the bitrate based on the request type
 
 	if TargetBitrate == "calc":
@@ -256,6 +261,9 @@ def BitRateCalc(Width, Height, FrameRate, BitRate):
 		NewBitrate = int(round(float(BitRate) / 2))
 	else:
 		NewBitrate = int(TargetBitrate)
+	
+	if VideoCodec == "h264":
+		NewBitrate = NewBitrate * 2.5
 	
 	# check the calculated bit is ok
 	if NewBitrate < LowBitRate:
@@ -282,7 +290,7 @@ def RescaleCalc(Width, Height):
 	return (NewWidth, HewHeight)
 	
 	
-def VideoParameters(VideoInfo, fileExt):
+def VideoParameters(VideoInfo, fileExt, VideoCodec):
 # work out all the video encoding parameters
 	
 	# if we've been asked to pass the video through then just do that
@@ -324,14 +332,20 @@ def VideoParameters(VideoInfo, fileExt):
 			Deinterlace= []
 			print bcolors.WARNING + "Got a progressive file so no change required" + bcolors.ENDC
 		
-		NewBitrate = BitRateCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], TargetFrameRate, VideoInfo[0]['BitRate'])
+		NewBitrate = BitRateCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], TargetFrameRate, VideoInfo[0]['BitRate'], VideoCodec)
+		
+		# deal with the formats
+		if VideoCodec == "h265":
+			ffcodec = 'nvenc_hevc'
+		elif VideoCodec == "h264":
+			ffcodec = 'nvenc'
 		
 		# create the bits of the ffmpeg command for the video
-		ffVid = ['-c:v', 'nvenc_hevc', '-b:v', str(NewBitrate)+'k', '-maxrate', '20000k', '-preset', 'hq']
+		ffVid = ['-c:v', ffcodec, '-b:v', str(NewBitrate)+'k', '-maxrate', '20000k', '-preset', 'hq']
 
 		ffVid = ffVid + Resample + Deinterlace
 		
-		print bcolors.OKGREEN + "Video : %s %sx%s at %dk %s long new HEVC file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['Width'], VideoInfo[0]['Height'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], TargetBitrate, NewBitrate) + bcolors.ENDC
+		print bcolors.OKGREEN + "Video : %s %sx%s at %dk %s long new %s file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['Width'], VideoInfo[0]['Height'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], VideoCodec, TargetBitrate, NewBitrate) + bcolors.ENDC
 	
 	if fileExt == '.avi':
 		mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 0)]
@@ -504,7 +518,7 @@ def RecodeFile (VidFileIn):
 		NewWidth=VideoInfo[0]['Width']
 	
 	# work out what to do with the Video
-	mapVid, ffVid, NewBitrate = VideoParameters(VideoInfo, fileExt)
+	mapVid, ffVid, NewBitrate = VideoParameters(VideoInfo, fileExt, VideoCodec)
 	
 	# Check work is required
 	if VideoInfo[0]['Format'] <> 'HEVC':
@@ -565,7 +579,7 @@ def RecodeFile (VidFileIn):
 
 def RecodeFolder (VidFileIn):
 	print bcolors.OKBLUE + 'Processing Folder :%s' %(VidFileIn) + bcolors.ENDC
-	Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(VidFileIn) for f in filenames if os.path.splitext(f)[1] in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg')]
+	Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(VidFileIn) for f in filenames if os.path.splitext(f)[1] in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg', '.3gp')]
 	Files.sort()
 	#Files.sort(reverse=True)
 	for File in Files:
@@ -602,7 +616,7 @@ CCP_WIN_A_TO_POSIX = 2
 CCP_WIN_W_TO_POSIX = 3
 
 # get the input values
-TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn = ReadInputVariables()
+TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, VideoCodec = ReadInputVariables()
 
 # check the TargetBitrate makes sense
 try:
@@ -615,9 +629,12 @@ except:
 	if TargetBitrate == 'half' and RescaleWidth <> None:
 		print bcolors.FAIL + "Cannot rescale and half the bitrate." + bcolors.ENDC
 		sys.exit(2)
+	if VideoCodec == "h264" and TargetBitrate not in ("calc", "calc2", "calc3"):
+		print bcolors.FAIL + "h264 can only be used with calc, calc2 and calc3." + bcolors.ENDC
+		sys.exit(2)
 
-print bcolors.OKBLUE + "Will encode %s using bitrate %s ,will process the audio as %s and will use a %s file" \
-	% (VidFileIn, TargetBitrate, AudioType, fileProcess) + bcolors.ENDC
+print bcolors.OKBLUE + "Will encode %s into %s using bitrate %s ,will process the audio as %s and will use a %s file" \
+	% (VidFileIn, VideoCodec, TargetBitrate, AudioType, fileProcess) + bcolors.ENDC
 
 
 # have we been given a file or a folder
