@@ -25,94 +25,94 @@ from subprocess import Popen, PIPE, STDOUT
 import select
 
 class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+	HEADER = '\033[95m'
+	OKBLUE = '\033[94m'
+	OKGREEN = '\033[92m'
+	WARNING = '\033[93m'
+	FAIL = '\033[91m'
+	ENDC = '\033[0m'
+	BOLD = '\033[1m'
+	UNDERLINE = '\033[4m'
 
 def copy_large_file(src, dst):
-    '''
-    Copy a large file showing progress.
-    '''
-    print('copying "{}" --> "{}"'.format(src, dst))
-    if os.path.exists(src) is False:
-        print('ERROR: file does not exist: "{}"'.format(src))
-        sys.exit(1)
-    if os.path.exists(dst) is True:
-        os.remove(dst)
-    if os.path.exists(dst) is True:
-        print('ERROR: file exists, cannot overwrite it: "{}"'.format(dst))
-        sys.exit(1)
+	'''
+	Copy a large file showing progress.
+	'''
+	print('copying "{}" --> "{}"'.format(src, dst))
+	if os.path.exists(src) is False:
+		print('ERROR: file does not exist: "{}"'.format(src))
+		sys.exit(1)
+	if os.path.exists(dst) is True:
+		os.remove(dst)
+	if os.path.exists(dst) is True:
+		print('ERROR: file exists, cannot overwrite it: "{}"'.format(dst))
+		sys.exit(1)
 
-    # Start the timer and get the size.
-    start = time.time()
-    size = os.stat(src).st_size
-    print('{} bytes'.format(size))
+	# Start the timer and get the size.
+	start = time.time()
+	size = os.stat(src).st_size
+	print('{} bytes'.format(size))
 
-    # Adjust the chunk size to the input size.
-    divisor = 10000  # .1%
-    chunk_size = size / divisor
-    while chunk_size == 0 and divisor > 0:
-        divisor /= 10
-        chunk_size = size / divisor
-    print('chunk size is {}'.format(chunk_size))
+	# Adjust the chunk size to the input size.
+	divisor = 10000  # .1%
+	chunk_size = size / divisor
+	while chunk_size == 0 and divisor > 0:
+		divisor /= 10
+		chunk_size = size / divisor
+	print('chunk size is {}'.format(chunk_size))
 
-    # Copy.
-    try:
-        with open(src, 'rb') as ifp:
-            with open(dst, 'wb') as ofp:
-                copied = 0  # bytes
-                chunk = ifp.read(chunk_size)
-                while chunk:
-                    # Write and calculate how much has been written so far.
-                    ofp.write(chunk)
-                    copied += len(chunk)
-                    per = 100. * float(copied) / float(size)
+	# Copy.
+	try:
+		with open(src, 'rb') as ifp:
+			with open(dst, 'wb') as ofp:
+				copied = 0  # bytes
+				chunk = ifp.read(chunk_size)
+				while chunk:
+					# Write and calculate how much has been written so far.
+					ofp.write(chunk)
+					copied += len(chunk)
+					per = 100. * float(copied) / float(size)
 
-                    # Calculate the estimated time remaining.
-                    elapsed = time.time() - start  # elapsed so far
-                    avg_time_per_byte = elapsed / float(copied)
-                    remaining = size - copied
-                    est = remaining * avg_time_per_byte
-                    est1 = size * avg_time_per_byte
-                    eststr = 'rem={:>.1f}s, tot={:>.1f}s'.format(est, est1)
+					# Calculate the estimated time remaining.
+					elapsed = time.time() - start  # elapsed so far
+					avg_time_per_byte = elapsed / float(copied)
+					remaining = size - copied
+					est = remaining * avg_time_per_byte
+					est1 = size * avg_time_per_byte
+					eststr = 'rem={:>.1f}s, tot={:>.1f}s'.format(est, est1)
 
-                    # Write out the status.
-                    sys.stdout.write('\r\033[K{:>6.1f}%  {}  {} --> {} '.format(per, eststr, src, dst))
-                    sys.stdout.flush()
+					# Write out the status.
+					sys.stdout.write('\r\033[K{:>6.1f}%  {}  {} --> {} '.format(per, eststr, src, dst))
+					sys.stdout.flush()
 
-                    # Read in the next chunk.
-                    chunk = ifp.read(chunk_size)
+					# Read in the next chunk.
+					chunk = ifp.read(chunk_size)
 
-    except IOError as obj:
-        print('\nERROR: {}'.format(obj))
-        sys.exit(1)
+	except IOError as obj:
+		print('\nERROR: {}'.format(obj))
+		sys.exit(1)
 
-    sys.stdout.write('\r\033[K')  # clear to EOL
-    elapsed = time.time() - start
-    print('copied "{}" --> "{}" in {:>.1f}s"'.format(src, dst, elapsed))
+	sys.stdout.write('\r\033[K')  # clear to EOL
+	elapsed = time.time() - start
+	print('copied "{}" --> "{}" in {:>.1f}s"'.format(src, dst, elapsed))
 	
 def win2posix(path):
 # convert from windows to cygwin format
-    result = cygwin_create_path(CCP_WIN_W_TO_POSIX,xunicode(path))
-    if result is None:
-        raise Exception("cygwin_create_path failed")
-    value = cast(result,c_char_p).value
-    free(result)
-    return value
+	result = cygwin_create_path(CCP_WIN_W_TO_POSIX,xunicode(path))
+	if result is None:
+		raise Exception("cygwin_create_path failed")
+	value = cast(result,c_char_p).value
+	free(result)
+	return value
 
 def posix2win(path):
 # convert from cygwin to windows format
-    result = cygwin_create_path(CCP_POSIX_TO_WIN_W,str(path))
-    if result is None:
-        raise Exception("cygwin_create_path failed")
-    value = cast(result,c_wchar_p).value
-    free(result)
-    return value
+	result = cygwin_create_path(CCP_POSIX_TO_WIN_W,str(path))
+	if result is None:
+		raise Exception("cygwin_create_path failed")
+	value = cast(result,c_wchar_p).value
+	free(result)
+	return value
 	
 def ReadInputVariables():
 # read in the input arguments
@@ -144,7 +144,7 @@ def ReadInputVariables():
 			
 		if opt in ("-a", "--audio"):
 			AudioType = arg
-			if AudioType not in ("pass", "all", "one", "best", "aac"):
+			if AudioType not in ("pass", "all", "one", "best", "aac", "64k"):
 				AudioType = "one"
 				
 		if opt in ("-h"):
@@ -218,7 +218,7 @@ def GetVideoInfo(VidFileIn):
 	VideoInfo = []
 	AudioInfo = []
 	SubInfo = []
-
+	
 	for track in media_info.tracks:
 		if track.track_type == 'Video':
 			try:
@@ -244,7 +244,7 @@ def GetVideoInfo(VidFileIn):
 			AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': track.bit_rate, 'Channels': track.channel_s })
 		elif track.track_type == 'Text':
 			SubInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'Language': track.language, 'Default': track.default, 'Forced': track.forced })
-
+	
 	return (VideoInfo, AudioInfo, SubInfo)
 
 	
@@ -361,6 +361,8 @@ def AudioParameters(AudioInfo, fileExt):
 	mapping=[]
 	counter = 0
 	format = 'mp4'
+	AudioBitrate = "128k"
+	AudioTypeTemp = AudioType
 	
 	if not AudioInfo:
 		# no audio so say so and do nothing
@@ -390,15 +392,19 @@ def AudioParameters(AudioInfo, fileExt):
 		print bcolors.OKGREEN + "Audio : Best track is :%s %sk %s channel %s" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
 		
 		# now figure out what to do with all the tracks
-		if AudioType in ("one", "aac"):
+		if AudioTypeTemp == "64k":
+			AudioTypeTemp = "aac"
+			AudioBitrate = "64k"
+		
+		if AudioTypeTemp in ("one", "aac"):
 			if fileExt == '.avi':
 				mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-0)]
 			else:
 				mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-1)]
 
-			if AudioInfo[bestTrack]['Channels'] < 6 or AudioType == "aac":
-				ffAud = ['-c:a:'+ str(bestTrack), 'libfdk_aac', '-b:a:'+ str(bestTrack), '128k', '-ar:'+ str(bestTrack), '48000']
-				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
+			if AudioInfo[bestTrack]['Channels'] < 6 or AudioTypeTemp == "aac":
+				ffAud = ['-c:a:'+ str(bestTrack), 'libfdk_aac', '-b:a:'+ str(bestTrack), AudioBitrate, '-ar:'+ str(bestTrack), '48000']
+				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s AAC" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format'], AudioBitrate) + bcolors.ENDC
 			elif AudioInfo[bestTrack]['Channels'] >= 6:
 				ffAud = ['-c:a:'+ str(bestTrack), 'ac3', '-b:a:'+ str(bestTrack), '384k', '-ar:'+ str(bestTrack), '48000']
 				format = 'mkv'
@@ -406,7 +412,7 @@ def AudioParameters(AudioInfo, fileExt):
 	
 		# for the others we need to look at all the tracks
 		counter = 0
-		if AudioType in ("best", "pass", "all"):
+		if AudioTypeTemp in ("best", "pass", "all"):
 			format = 'mkv'
 			for track in AudioInfo:
 				if fileExt == '.avi':
@@ -414,13 +420,13 @@ def AudioParameters(AudioInfo, fileExt):
 				else:
 					mapping = mapping + ['-map', '0:' + str(track['ID']-1)]
 			
-				if (counter == bestTrack and AudioType == "best") or AudioType == "pass":
+				if (counter == bestTrack and AudioTypeTemp == "best") or AudioTypeTemp == "pass":
 					ffAud = ffAud + ['-c:a:'+ str(counter), 'copy']
 					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s channel %s and passing it through" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
 				else:
 					if track['Channels'] == 2:
-						ffAud = ffAud + ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), '128k', '-ar:'+ str(counter), '48000']
-						print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 128k AAC" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+						ffAud = ffAud + ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), AudioBitrate, '-ar:'+ str(counter), '48000']
+						print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s AAC" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format'], AudioBitrate) + bcolors.ENDC
 					elif track['Channels'] >= 6:
 						ffAud = ffAud + ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000']
 						format = 'mkv'
@@ -617,6 +623,8 @@ CCP_WIN_W_TO_POSIX = 3
 
 # get the input values
 TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, VideoCodec = ReadInputVariables()
+
+print AudioType
 
 # check the TargetBitrate makes sense
 try:
