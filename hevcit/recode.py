@@ -490,6 +490,15 @@ def FileNameCalc(VidFileIn, fileProcess, format):
 		VidFileIn = VidFileIn
 		VidFileOutName, VidFileOutExt = ntpath.splitext(VidFileIn)
 		VidFileOut = VidFileOutName + '_new' + '.' + format
+		
+	if fileProcess == 'replace':
+		tmpRandom = base64.b64encode(os.urandom(12), '__')
+		VidFileOutName, VidFileOutExt = ntpath.splitext(VidFileIn)
+		VidFileOut = VidFileOutName + '.' + format
+		VidFileIn = VidFileOutName + '_' + tmpRandom + VidFileOutExt
+		# rename the file
+		os.rename(VidFileOut, VidFileIn)
+		print bcolors.OKBLUE + "File renamed from %s to %s" %(VidFileOut, VidFileIn) + bcolors.ENDC
 	
 	return (VidFileIn, VidFileOut)
 
@@ -579,6 +588,11 @@ def RecodeFile (VidFileIn):
 
 		# and run it
 		subprocess.call(ffCommand)
+		
+		# if we are replacing the file then remove the temp file now
+		if fileProcess == 'replace':
+			os.remove(VidFileIn)
+		
 	else:
 		print bcolors.FAIL + "No work required" + bcolors.ENDC
 	
