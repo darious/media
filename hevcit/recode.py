@@ -370,7 +370,7 @@ def VideoParameters(VideoInfo, fileExt, VideoCodec, AllInfo):
 	return mapping, ffVid, NewBitrate
 
 
-def AudioParameters2(AudioInfo, fileExt, AllInfo):
+def AudioParameters(AudioInfo, fileExt, AllInfo):
 # work out what to do with the audio
 	ffAud=[]
 	mapping=[]
