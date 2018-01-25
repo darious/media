@@ -119,7 +119,7 @@ def ReadInputVariables():
 
 	helpstring = 'recode.py -b <Target Bitrate Type> -t <test duration to encode> -a <how to process the audio> -h <new or backup> -r <width to rescal to, e.g. 1280> -o Y <ignore the check that we have already coded> -f <Input Video File> -v <Video codec h264 or h265>'
 	try:
-		opts, args = getopt.getopt(sys.argv[1:],"b:t:a:h:r:f:o:v:",["TargetBitrate=","VidFileIn="])
+		opts, args = getopt.getopt(sys.argv[1:],"b:t:a:h:r:f:o:v:p",["TargetBitrate=","VidFileIn="])
 	except getopt.GetoptError:
 		print helpstring
 		sys.exit(2)
@@ -131,6 +131,7 @@ def ReadInputVariables():
 	fileProcess="new"
 	RescaleWidth = None
 	VideoCodec = "h265"
+	PrintMode = 0
 	
 	for opt, arg in opts:    
 		if opt in ("-b", "--bitrate"):
@@ -144,7 +145,7 @@ def ReadInputVariables():
 			
 		if opt in ("-a", "--audio"):
 			AudioType = arg
-			if AudioType not in ("pass", "all", "one", "best", "aac", "64k"):
+			if AudioType not in ("passall", "all", "one", "passbest", "aac", "64k"):
 				AudioType = "one"
 				
 		if opt in ("-h"):
@@ -157,13 +158,17 @@ def ReadInputVariables():
 			VideoCodec = arg
 			if VideoCodec not in ("h264", "h265"):
 				VideoCodec = "h265"
+				
+		if opt in ("-p", "--print"):
+			PrintMode = 1
+			fileProcess = "new"
 	
 	# check for missing values
 	if TargetBitrate=="" or VidFileIn=="":
 		print helpstring
 		sys.exit(2)
 	
-	return (TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, VideoCodec)
+	return (TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, VideoCodec, PrintMode)
 
 
 def ZeroBitrate(VidFileIn, TrackID, Type):
@@ -218,8 +223,13 @@ def GetVideoInfo(VidFileIn):
 	VideoInfo = []
 	AudioInfo = []
 	SubInfo = []
+	AllInfo = []
+	
+	counter = - 1
 	
 	for track in media_info.tracks:
+		if track.track_type in ('Audio', 'Video', 'Text'):
+			counter += 1
 		if track.track_type == 'Video':
 			try:
 				tmpBitRate = int(track.bit_rate)
@@ -237,15 +247,18 @@ def GetVideoInfo(VidFileIn):
 			if track.duration is None:
 				track.duration = 0
 			VideoInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': float(track.bit_rate)/1000, 'Width': track.width, 'Height': track.height, 'FrameRate': track.frame_rate, 'Duration': datetime.timedelta(milliseconds=float(track.duration)), 'ScanType': track.scan_type })
+			AllInfo.append ({ 'Type':'Video', 'ID': track.track_id, 'counter':counter })
 		elif track.track_type == 'Audio':
 			if track.bit_rate is None:
 				print bcolors.WARNING + "Audio Got a 0 Bitrate so extracting the data to new file." + bcolors.ENDC
 				track.bit_rate = ZeroBitrate(VidFileIn, int(track.track_id) - 1, 'A')
 			AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': track.bit_rate, 'Channels': track.channel_s })
+			AllInfo.append ({ 'Type':'Audio', 'ID': track.track_id, 'counter':counter })
 		elif track.track_type == 'Text':
 			SubInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'Language': track.language, 'Default': track.default, 'Forced': track.forced })
+			AllInfo.append ({ 'Type':'Sub', 'ID': track.track_id, 'counter':counter })
 	
-	return (VideoInfo, AudioInfo, SubInfo)
+	return (VideoInfo, AudioInfo, SubInfo, AllInfo)
 
 	
 def BitRateCalc(Width, Height, FrameRate, BitRate, VideoCodec):
@@ -290,8 +303,10 @@ def RescaleCalc(Width, Height):
 	return (NewWidth, HewHeight)
 	
 	
-def VideoParameters(VideoInfo, fileExt, VideoCodec):
+def VideoParameters(VideoInfo, fileExt, VideoCodec, AllInfo):
 # work out all the video encoding parameters
+	
+	NewBitrate = 0
 	
 	# if we've been asked to pass the video through then just do that
 	if TargetBitrate == "pass":
@@ -347,21 +362,20 @@ def VideoParameters(VideoInfo, fileExt, VideoCodec):
 		
 		print bcolors.OKGREEN + "Video : %s %sx%s at %dk %s long new %s file will be bitrate (%s) %dk" % (VideoInfo[0]['Format'], VideoInfo[0]['Width'], VideoInfo[0]['Height'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], VideoCodec, TargetBitrate, NewBitrate) + bcolors.ENDC
 	
-	if fileExt == '.avi':
-		mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 0)]
-	else:
-		mapping = ['-map', '0:'+str(VideoInfo[0]['ID'] - 1)]
+	# calculate the mapping
+	for c in AllInfo:
+		if c['ID'] == VideoInfo[0]['ID']:
+			mapping = ['-map', '0:'+str(c['counter'])]
 	
 	return mapping, ffVid, NewBitrate
 
 
-def AudioParameters(AudioInfo, fileExt):
+def AudioParameters2(AudioInfo, fileExt, AllInfo):
 # work out what to do with the audio
 	ffAud=[]
 	mapping=[]
-	counter = 0
+	counter = -1
 	format = 'mp4'
-	AudioBitrate = "128k"
 	AudioTypeTemp = AudioType
 	
 	if not AudioInfo:
@@ -381,58 +395,83 @@ def AudioParameters(AudioInfo, fileExt):
 				track['BitRate']=int(384000)
 		
 		# work out which is the best track
-		bestTrack=0
+		bestTrackID=AudioInfo[0]['ID']
+		bestTrackIx=0
 		channels=int(AudioInfo[0]['Channels'])
 		
 		for track in AudioInfo:
+			counter+=1
 			if int(track['Channels']) > channels:
-				bestTrack=track['ID'] - 1
-				counter+=1
-
-		print bcolors.OKGREEN + "Audio : Best track is :%s %sk %s channel %s" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+				bestTrackID=AudioInfo[0]['ID']
+				bestTrackIx=counter
 		
-		# now figure out what to do with all the tracks
-		if AudioTypeTemp == "64k":
-			AudioTypeTemp = "aac"
-			AudioBitrate = "64k"
-		
-		if AudioTypeTemp in ("one", "aac"):
-			if fileExt == '.avi':
-				mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-0)]
-			else:
-				mapping = ['-map', '0:' + str(AudioInfo[bestTrack]['ID']-1)]
-
-			if AudioInfo[bestTrack]['Channels'] < 6 or AudioTypeTemp == "aac":
-				ffAud = ['-c:a:'+ str(bestTrack), 'libfdk_aac', '-b:a:'+ str(bestTrack), AudioBitrate, '-ar:'+ str(bestTrack), '48000']
-				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s AAC" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format'], AudioBitrate) + bcolors.ENDC
-			elif AudioInfo[bestTrack]['Channels'] >= 6:
-				ffAud = ['-c:a:'+ str(bestTrack), 'ac3', '-b:a:'+ str(bestTrack), '384k', '-ar:'+ str(bestTrack), '48000']
+		# recode one track
+		if AudioTypeTemp in ("one", "aac", "64k"):
+			if AudioInfo[bestTrackIx]['Channels'] >= 6:
+				AudioBitrate = '384k'
+				AudioCodec = 'ac3'
 				format = 'mkv'
-				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 384k AC3" % (str(AudioInfo[bestTrack]['ID'] - 1), AudioInfo[bestTrack]['BitRate']/1000, AudioInfo[bestTrack]['Channels'], AudioInfo[bestTrack]['Format']) + bcolors.ENDC
-	
-		# for the others we need to look at all the tracks
-		counter = 0
-		if AudioTypeTemp in ("best", "pass", "all"):
+			else:
+				AudioBitrate = '128k'
+				AudioCodec = 'libfdk_aac'
+				format = 'mp4'
+			
+			if AudioTypeTemp == '64k':
+				AudioBitrate = '64k'
+			
+			ffAud = ['-c:a:0', AudioCodec, '-b:a:0', AudioBitrate, '-ar:0', '48000']
+			
+			# calculate the mapping
+			for c in AllInfo:
+				if c['ID'] == AudioInfo[bestTrackIx]['ID']:
+					mapping = ['-map', '0:'+str(c['counter'])]
+			
+			print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s AAC" % (str(AudioInfo[bestTrackIx]['ID'] - 1), AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'], AudioBitrate) + bcolors.ENDC
+		
+		# pass throught the best track
+		elif AudioTypeTemp == "passbest":
+			ffAud = ['-c:a:0', 'copy']
+			format = 'mkv'
+			
+			# calculate the mapping
+			for c in AllInfo:
+				if c['ID'] == AudioInfo[bestTrackIx]['ID']:
+					mapping = ['-map', '0:'+str(c['counter'])]
+					
+			print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s channel %s and passing it through" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+		
+		elif AudioTypeTemp == "passall":
+			counter = 0
 			format = 'mkv'
 			for track in AudioInfo:
-				if fileExt == '.avi':
-					mapping = mapping + ['-map', '0:' + str(track['ID']-0)]
-				else:
-					mapping = mapping + ['-map', '0:' + str(track['ID']-1)]
-			
-				if (counter == bestTrack and AudioTypeTemp == "best") or AudioTypeTemp == "pass":
-					ffAud = ffAud + ['-c:a:'+ str(counter), 'copy']
-					print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s channel %s and passing it through" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
-				else:
-					if track['Channels'] == 2:
-						ffAud = ffAud + ['-c:a:'+ str(counter), 'libfdk_aac', '-b:a:'+ str(counter), AudioBitrate, '-ar:'+ str(counter), '48000']
-						print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s AAC" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format'], AudioBitrate) + bcolors.ENDC
-					elif track['Channels'] >= 6:
-						ffAud = ffAud + ['-c:a:'+ str(counter), 'ac3', '-b:a:'+ str(counter), '384k', '-ar:'+ str(counter), '48000']
-						format = 'mkv'
-						print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to 384k AC3" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+				ffAud = ffAud + ['-c:a:'+ str(counter), 'copy']
+				print bcolors.OKGREEN + "Audio : Keeping track %s %sk %s channel %s and passing it through" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format']) + bcolors.ENDC
+				# calculate the mapping
+				for c in AllInfo:
+					if c['ID'] == AudioInfo[counter]['ID']:
+						mapping += ['-map', '0:'+str(c['counter'])]
 				counter += 1
-	
+				
+		elif AudioTypeTemp == "all":
+			counter = 0
+			format = 'mkv'
+			for track in AudioInfo:
+				if AudioInfo[counter]['Channels'] >= 6:
+					AudioBitrate = '384k'
+					AudioCodec = 'ac3'
+				else:
+					AudioBitrate = '128k'
+					AudioCodec = 'libfdk_aac'
+					
+				ffAud += ['-c:a:' + str(counter), AudioCodec, '-b:a:' + str(counter), AudioBitrate, '-ar:' + str(counter), '48000']
+			
+				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s AAC" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format'], AudioBitrate) + bcolors.ENDC
+				# calculate the mapping
+				for c in AllInfo:
+					if c['ID'] == AudioInfo[counter]['ID']:
+						mapping += ['-map', '0:'+str(c['counter'])]
+				counter += 1
+
 	return (mapping, ffAud, format)
 
 
@@ -519,12 +558,18 @@ def RecodeFile (VidFileIn):
 	fileExt = ntpath.splitext(VidFileInWin)[1]
 	
 	# get the info all all the tracks in the file
-	VideoInfo, AudioInfo, SubInfo = GetVideoInfo(VidFileInWin)
+	VideoInfo, AudioInfo, SubInfo, AllInfo = GetVideoInfo(VidFileInWin)
+	
+	#debug
+	#print VideoInfo
+	#print AudioInfo
+	#print SubInfo
+	#print AllInfo
 
 	# have we been asked to rescale
 	OldWidth=VideoInfo[0]['Width']
 	ffRescale=[]
-	if RescaleWidth <> None:
+	if RescaleWidth <> None and TargetBitrate <> "pass":
 		NewWidth, NewHeight = RescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'])
 		VideoInfo[0]['Height'] = NewHeight
 		VideoInfo[0]['Width'] = NewWidth
@@ -533,7 +578,7 @@ def RecodeFile (VidFileIn):
 		NewWidth=VideoInfo[0]['Width']
 	
 	# work out what to do with the Video
-	mapVid, ffVid, NewBitrate = VideoParameters(VideoInfo, fileExt, VideoCodec)
+	mapVid, ffVid, NewBitrate = VideoParameters(VideoInfo, fileExt, VideoCodec, AllInfo)
 	
 	# Check work is required
 	if VideoInfo[0]['Format'] <> 'HEVC':
@@ -548,7 +593,7 @@ def RecodeFile (VidFileIn):
 	
 	if workreq==1:
 		# work out what to do with the Audio
-		mapAud, ffAud, formatAud = AudioParameters(AudioInfo, fileExt)
+		mapAud, ffAud, formatAud = AudioParameters(AudioInfo, fileExt, AllInfo)
 
 		print bcolors.WARNING + "Recoding as %s" % (workreas) + bcolors.ENDC
 		
@@ -587,12 +632,13 @@ def RecodeFile (VidFileIn):
 		print bcolors.OKBLUE + 'ffmpeg command : %r' % ' '.join(ffCommand) + bcolors.ENDC
 
 		# and run it
-		subprocess.call(ffCommand)
-		
-		# if we are replacing the file then remove the temp file now
-		if fileProcess == 'replace':
-			os.remove(VidFileIn)
-		
+		if PrintMode == 0:
+			subprocess.call(ffCommand)
+			# if we are replacing the file then remove the temp file now
+			if fileProcess == 'replace':
+				os.remove(VidFileIn)
+		else:
+			print bcolors.FAIL + "Print mode used no recode performed." + bcolors.ENDC
 	else:
 		print bcolors.FAIL + "No work required" + bcolors.ENDC
 	
@@ -636,9 +682,9 @@ CCP_WIN_A_TO_POSIX = 2
 CCP_WIN_W_TO_POSIX = 3
 
 # get the input values
-TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, VideoCodec = ReadInputVariables()
+TargetBitrate, TestDuration, AudioType, fileProcess, RescaleWidth, VidFileIn, VideoCodec, PrintMode = ReadInputVariables()
 
-print AudioType
+print PrintMode
 
 # check the TargetBitrate makes sense
 try:
