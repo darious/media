@@ -426,7 +426,7 @@ def AudioParameters(AudioInfo, fileExt, AllInfo):
 				if c['ID'] == AudioInfo[bestTrackIx]['ID']:
 					mapping = ['-map', '0:'+str(c['counter'])]
 			
-			print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s AAC" % (str(AudioInfo[bestTrackIx]['ID'] - 1), AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'], AudioBitrate) + bcolors.ENDC
+			print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s %s" % (str(AudioInfo[bestTrackIx]['ID'] - 1), AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'], AudioBitrate, AudioCodec) + bcolors.ENDC
 		
 		# pass throught the best track
 		elif AudioTypeTemp == "passbest":
@@ -465,7 +465,7 @@ def AudioParameters(AudioInfo, fileExt, AllInfo):
 					
 				ffAud += ['-c:a:' + str(counter), AudioCodec, '-b:a:' + str(counter), AudioBitrate, '-ar:' + str(counter), '48000']
 			
-				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s AAC" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format'], AudioBitrate) + bcolors.ENDC
+				print bcolors.OKGREEN + "Audio : Keeping track :%s %sk %s channel %s, will recode to %s %s" % (str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format'], AudioBitrate, AudioCodec) + bcolors.ENDC
 				# calculate the mapping
 				for c in AllInfo:
 					if c['ID'] == AudioInfo[counter]['ID']:
