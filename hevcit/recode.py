@@ -531,13 +531,16 @@ def FileNameCalc(VidFileIn, fileProcess, format):
 		VidFileOut = VidFileOutName + '_new' + '.' + format
 		
 	if fileProcess == 'replace':
+		VidFileStart = VidFileIn
 		tmpRandom = base64.b64encode(os.urandom(12), '__')
 		VidFileOutName, VidFileOutExt = ntpath.splitext(VidFileIn)
 		VidFileOut = VidFileOutName + '.' + format
 		VidFileIn = VidFileOutName + '_' + tmpRandom + VidFileOutExt
 		# rename the file
-		os.rename(VidFileOut, VidFileIn)
-		print bcolors.OKBLUE + "File renamed from %s to %s" %(VidFileOut, VidFileIn) + bcolors.ENDC
+		print VidFileOut
+		print VidFileIn
+		os.rename(VidFileStart, VidFileIn)
+		print bcolors.OKBLUE + "File renamed from %s to %s" %(VidFileStart, VidFileIn) + bcolors.ENDC
 	
 	return (VidFileIn, VidFileOut)
 
