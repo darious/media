@@ -38,6 +38,7 @@ cli_parser.add_argument('-p','--printmode', help='Print the recode command, do n
 cli_parser.add_argument('-s','--process', metavar='<process>', help='Method to be used to process the file, new, backup, replace', required=True)
 cli_parser.add_argument('-f','--file', metavar='<file>', help='File or folder to process', required=True)
 cli_parser.add_argument('-d','--debug', help='Debug mode, very verbose', required=False,action='store_true')
+cli_parser.add_argument('-l','--ludicrous', help='Print a ludicrous amount of information about the source tracks', required=False,action='store_true')
 cli_args = cli_parser.parse_args()
 
 
@@ -62,7 +63,7 @@ def RecodeFile(filename):
     # grab the file extension
     FileExt = os.path.splitext(filename)[1]
 
-    VideoInfo, AudioInfo, SubInfo, AllInfo = video.GetVideoInfo(filename)
+    VideoInfo, AudioInfo, SubInfo, AllInfo = video.GetVideoInfo(filename, TmpDir, cli_args.ludicrous)
 
     # some debug logging
     logger.debug("VideoInfo : %s", VideoInfo)
@@ -75,6 +76,7 @@ def RecodeFile(filename):
         ffRescale, NewWidth = video.VideoRescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], cli_args.rescale)
     else:
         NewWidth = VideoInfo[0]['Width']
+        ffRescale = []
 
     mapVid, ffVid, NewBitrate = video.VideoParameters(VideoInfo, cli_args.bitrate, cli_args.video, AllInfo, LowBitRate)
 

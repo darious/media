@@ -7,6 +7,10 @@ Ver  Date        Author      Comment
 """
 
 import datetime
+import sys
+import os
+import subprocess
+import base64
 
 # import mediainfo
 from pymediainfo import MediaInfo
@@ -16,7 +20,54 @@ import core_functions as core
 
 _logger=core.module_null_logger(__name__)
 
-def GetVideoInfo(VidFileIn):
+
+def ZeroBitrate(VidFileIn, TrackID, Type, TmpDir):
+    _logger.info("Got a 0 bitrate so creating temp file to check %s track %s", VidFileIn, TrackID)
+    # deal with a 0 bitrate and work out what it is
+    tmpRandom = base64.b64encode(os.urandom(12), '__')
+    VidFileTemp = TmpDir + os.path.basename(VidFileIn) + '_' + tmpRandom + '.mkv'
+
+    # create a new file with just this stream
+    if Type == 'V':
+        codec = ['-c:v:0', 'copy', '-an']
+    if Type == 'A':
+        codec = ['-c:a:0', 'copy', '-vn']
+
+    ffCommand = ['ffmpeg_g.exe',  '-i',  VidFileIn] + codec + [VidFileTemp]
+
+    # show the command
+    _logger.info("Creating temp file with ffmpeg command : %s", ' '.join(ffCommand))
+
+    # and run it
+    subprocess.check_call(ffCommand)
+
+    # read the data
+    media_info = MediaInfo.parse(VidFileTemp)
+
+    tmpBitrate = None
+    for track in media_info.tracks:
+        #for key, value in track.to_data().iteritems():
+        #    print str(key).ljust(30) + ' : ' + str(value)
+        if track.overall_bit_rate is not None:
+            tmpBitrate = track.overall_bit_rate
+        
+    if tmpBitrate == None:
+        _logger.critical("Still Got a 0 bitrate from demux file. Exiting")
+        sys.exit(2)
+
+    _logger.debug("Bitrate from demux for %s", tmpBitrate)
+
+    # drop the temp file
+    try:
+        os.remove(VidFileTemp)
+        _logger.debug("Temp file %s dropped", VidFileTemp)
+    except OSError:
+        pass
+
+    return tmpBitrate
+
+
+def GetVideoInfo(VidFileIn, TmpDir, ludicrous):
     """Get all the info about a given media file
     Parameters : Path to a media file
     Returns: Four list of dicts describing the video, audio, subtitle and all track info
@@ -39,48 +90,59 @@ def GetVideoInfo(VidFileIn):
     for track in media_info.tracks:
         _logger.debug("Processing track %s type %s", track.track_id, track.track_type)
 
+        if ludicrous:
+            for key, value in track.to_data().iteritems():
+                _logger.debug("Track ID : %s Type : %s %s = %s", track.track_id, track.track_type, key.ljust(40), value)
+
         if track.track_type in ('Audio', 'Video', 'Text'):
-			counter += 1
+            counter += 1
+            # clean up the stream info and append to the allinfo list           
+            try:
+                streamorder = int(track.streamorder)
+            except:
+                streamorder = int(track.streamorder.split('-')[1])
+            _logger.debug("Stream order for track %s type %s is %s", track.track_id, track.track_type, streamorder)
+            AllInfo.append ({ 'Type':track.track_type, 'ID': track.track_id, 'counter':counter, 'streamorder':streamorder })
 
         # if a video track grab the details
         if track.track_type == 'Video':
             # Check the bitrate makes sense by trying to convert it to an integer
             try:
                 tmpBitRate = int(track.bit_rate)
-                _logger.debug("Bitrate for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
+                _logger.info("Bitrate for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
             except:
                 _logger.debug("Bitrate cannot be determined from MediaInfo for track %s type %s", track.track_id, track.track_type)
-                tmpBitRate = 0
-                sys.exit(2)
+                # guess based on the filesize and other info
+                tmpBitRate = ZeroBitrate(VidFileIn, 0, 'V', TmpDir)
+                _logger.info("Bitrate from demux for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
 
             # if the file is a varible framerate pretend its 25 fps
             if track.frame_rate_mode == 'VFR':
-			    track.frame_rate = 25
+                track.frame_rate = 25
 
             # default the duration if there is none
             if track.duration is None:
-			    track.duration = 0
+                track.duration = 0
 
             # append the information to the arrays
-            VideoInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': float(tmpBitRate)/1000, 'Width': track.width, 'Height': track.height, 'FrameRate': track.frame_rate, 'Duration': datetime.timedelta(milliseconds=float(track.duration)), 'ScanType': track.scan_type })
-            AllInfo.append ({ 'Type':'Video', 'ID': track.track_id, 'counter':counter })
+            VideoInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': float(tmpBitRate)/1000, 'Width': track.width, 'Height': track.height, 'FrameRate': track.frame_rate, 'Duration': datetime.timedelta(milliseconds=float(track.duration)), 'ScanType': track.scan_type, 'streamorder':streamorder })
 
         # if an Audio track grab the details
         elif track.track_type == 'Audio':
             if track.bit_rate is None:
                 _logger.debug("Bitrate cannot be determined from MediaInfo for track %s type %s", track.track_id, track.track_type)
-                track.bit_rate = 0
+                tmpBitRate = ZeroBitrate(VidFileIn, int(track.track_id) - 1, 'A', TmpDir)
+                _logger.info("Bitrate from demux for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
             else:
+                tmpBitRate = track.bit_rate
                 _logger.debug("Bitrate for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
-                AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': track.bit_rate, 'Channels': track.channel_s })
-			
-            AllInfo.append ({ 'Type':'Audio', 'ID': track.track_id, 'counter':counter })
+
+            AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': track.bit_rate, 'Channels': track.channel_s, 'streamorder':streamorder })
 
         # and finally text tracks (subtitles)
         elif track.track_type == 'Text':
-			SubInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'Language': track.language, 'Default': track.default, 'Forced': track.forced })
-			AllInfo.append ({ 'Type':'Sub', 'ID': track.track_id, 'counter':counter })
-
+            SubInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'Language': track.language, 'Default': track.default, 'Forced': track.forced, 'streamorder':streamorder })
+        
     return (VideoInfo, AudioInfo, SubInfo, AllInfo)
 
 
@@ -189,9 +251,7 @@ def VideoParameters(VideoInfo, TargetBitrate, VideoCodec, AllInfo, LowBitRate):
         _logger.info("Video : %s %sx%s at %dk %s long new %s file will be bitrate (%s) %dk", VideoInfo[0]['Format'], VideoInfo[0]['Width'], VideoInfo[0]['Height'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'], VideoCodec, TargetBitrate, NewBitrate)
 
     # calculate the mapping
-    for c in AllInfo:
-        if c['ID'] == VideoInfo[0]['ID']:
-            mapping = ['-map', '0:'+str(c['counter'])]
+    mapping = ['-map', '0:'+str(VideoInfo[0]['streamorder'])]
     
     return mapping, ffVid, NewBitrate
 
@@ -259,9 +319,7 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
             ffAud = ['-c:a:0', AudioCodec, '-b:a:0', AudioBitrate, '-ar:0', '48000']
 
             # calculate the mapping
-            for c in AllInfo:
-                if c['ID'] == AudioInfo[bestTrackIx]['ID']:
-                    mapping = ['-map', '0:'+str(c['counter'])]
+            mapping = ['-map', '0:'+str(AudioInfo[bestTrackIx]['streamorder'])]
 
             _logger.info("Keeping Audio track :%s %sk %s channel %s, will recode to %s %s", str(AudioInfo[bestTrackIx]['ID'] - 1), AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'], AudioBitrate, AudioCodec)
 
@@ -269,12 +327,10 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
         elif AudioProcess == "passbest":
             ffAud = ['-c:a:0', 'copy']
             format = 'mkv'
-			
+            
             # calculate the mapping
-            for c in AllInfo:
-                if c['ID'] == AudioInfo[bestTrackIx]['ID']:
-                    mapping = ['-map', '0:'+str(c['counter'])]
-					
+            mapping = ['-map', '0:'+str(AudioInfo[bestTrackIx]['streamorder'])]
+                    
             _logger.info("Keeping Audio track %s %sk %s channel %s and passing it through", str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format'])
             
         elif AudioProcess == "passall":
@@ -283,11 +339,8 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
             for track in AudioInfo:
                 ffAud = ffAud + ['-c:a:'+ str(counter), 'copy']
                 _logger.info("Keeping Audio track %s %sk %s channel %s and passing it through", str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format'])
-            
-            # calculate the mapping
-            for c in AllInfo:
-                if c['ID'] == AudioInfo[counter]['ID']:
-                    mapping += ['-map', '0:'+str(c['counter'])]
+                # calculate the mapping
+                mapping += ['-map', '0:'+str(track['streamorder'])]
             counter += 1
         
         elif AudioProcess == "all":
@@ -308,13 +361,9 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
                 ffAud += ['-c:a:' + str(counter), AudioCodec, '-b:a:' + str(counter), AudioBitrate, '-ar:' + str(counter), '48000']
 
                 _logger.info("Keeping Audio track :%s %sk %s channel %s, will recode to %s %s", str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format'], AudioBitrate, AudioCodec)
+                # calculate the mapping
+                mapping += ['-map', '0:'+str(track['streamorder'])]
             
-            # calculate the mapping
-            for c in AllInfo:
-                if c['ID'] == AudioInfo[counter]['ID']:
-                    mapping += ['-map', '0:'+str(c['counter'])]
-                    counter += 1
-
     return (mapping, ffAud, format)
 
 
@@ -334,7 +383,7 @@ def SubParameters(SubInfo):
         if track['Language'] == 'en' or track['Forced'] == 'Yes':
             #or track['Default'] == 'Yes' 
             # subtitle is english, default or forced, so we'll keep it
-            mapping = mapping + ['-map', '0:' + str(track['ID'] - 1)]
+            mapping += ['-map', '0:'+str(track['streamorder'])]
             if track['Format'] in ("ASS", "UTF-8", "SSA"):
                 # a format we can recode so we will
                 ffSub = ffSub + ['-c:s:'+str(counter), 'ass']
