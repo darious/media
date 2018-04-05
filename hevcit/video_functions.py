@@ -137,7 +137,20 @@ def GetVideoInfo(VidFileIn, TmpDir, ludicrous):
                 tmpBitRate = track.bit_rate
                 _logger.debug("Bitrate for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
 
-            AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': track.bit_rate, 'Channels': track.channel_s, 'streamorder':streamorder })
+            # tidy up the bitrate
+            if "/" in str(track.bit_rate):
+                tmpBitRate = int(str(track.bit_rate).split(" / ")[0])
+            
+            # tidy up the channels
+            if track.channel_s == '8 / 6':              tmpChannels = 8
+            elif track.channel_s == '7 / 6':            tmpChannels = 7
+            elif track.channel_s == '20 / 6':           tmpChannels = 6
+            elif track.channel_s == '7 / 7 / 6':        tmpChannels = 6
+            elif track.channel_s == '8 / 7 / 6':        tmpChannels = 6
+            elif track.channel_s == 'Object Based / 8': tmpChannels = 8
+            else: tmpChannels = track.channel_s
+
+            AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': tmpBitRate, 'Channels': tmpChannels, 'language': track.language, 'streamorder':streamorder })
 
         # and finally text tracks (subtitles)
         elif track.track_type == 'Text':
@@ -281,13 +294,6 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
     else:
         # fix the channel metadata if required
         for track in AudioInfo:
-            
-            if track['Channels'] == '8 / 6': track['Channels'] = 8
-            if track['Channels'] == '7 / 6': track['Channels'] = 7
-            if track['Channels'] == '20 / 6': track['Channels'] = 6
-            if track['Channels'] == '7 / 7 / 6': track['Channels'] = 6
-            if track['Channels'] == '8 / 7 / 6': track['Channels'] = 6
-
             try:
                 track['BitRate']=int(track['BitRate'])
             except:
@@ -297,13 +303,33 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
         _logger.info("Calculating best Audio track")
         bestTrackID=AudioInfo[0]['ID']
         bestTrackIx=0
-        channels=int(AudioInfo[0]['Channels'])
-        for track in AudioInfo:
-            _logger.debug("Audio track %s, %s Channels, %sk %s", track['ID'], track['Channels'], track['BitRate']/1000, track['Format'])
-            counter += 1
-            if int(track['Channels']) > channels:
-                bestTrackID=AudioInfo[0]['ID']
-                bestTrackIx=counter
+
+        if len(AudioInfo) > 1:
+            bestChannels=int(AudioInfo[0]['Channels'])
+            bestBitrate=int(AudioInfo[0]['BitRate'])
+            bestLang=AudioInfo[0]['language']
+            bestFormat=0
+
+            for track in AudioInfo:
+                _logger.debug("Audio track %s, %s Channels, %sk %s", track['ID'], track['Channels'], track['BitRate']/1000, track['Format'])
+                counter += 1
+                if   track['Format'] == 'MPEG Audio': currFormat = 0
+                elif track['Format'] == 'AAC':        currFormat = 1
+                elif track['Format'] == 'Opus':       currFormat = 2
+                elif track['Format'] == 'FLAC':       currFormat = 3
+                elif track['Format'] == 'AC-3':       currFormat = 4
+                elif track['Format'] == 'E-AC-3':     currFormat = 5
+                elif track['Format'] == 'DTS':        currFormat = 6
+                elif track['Format'] == 'TrueHD':     currFormat = 7
+                elif track['Fomrat'] == 'DTS-HD':     currFormat = 8
+                else: 
+                    print 'Error format %s not catered for' %track['Format']
+                    sys.exit(2)
+                if int(track['Channels']) >= bestChannels:
+                    if int(track['BitRate']) > bestBitrate or (bestLang != 'en' and track['langauge'] == 'en') or currFormat > bestFormat:
+                        bestTrackID=AudioInfo[0]['ID']
+                        bestTrackIx=counter
+
 
         _logger.info("Best track ID : %s, Index : %s which is %sk %s channel %s", bestTrackID, bestTrackIx, AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'])
         
