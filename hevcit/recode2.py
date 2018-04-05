@@ -162,7 +162,7 @@ def RecodeFile(filename):
             VidFileIn = os.path.splitext(filename)[0] + '_' + tmpRandom + os.path.splitext(filename)[1]
             VifFileOt = os.path.splitext(filename)[0] + '.' + format
             if cli_args.printmode != True:
-                logger.info("Renaming file from %s to %s", VidFileIn, VifFileOt)
+                logger.info("Renaming file from %s to %s", VifFileOt, VidFileIn)
                 os.rename(filename, VidFileIn)
             else:
                 logger.info("Print mode : File will not be renamed")

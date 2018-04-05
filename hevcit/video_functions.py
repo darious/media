@@ -184,6 +184,7 @@ def VideoParameters(VideoInfo, TargetBitrate, VideoCodec, AllInfo, LowBitRate):
     # if we've been asked to pass the video through then just do that
     if TargetBitrate == "pass":
         ffVid = ['-c:v', 'copy']
+        NewBitrate = VideoInfo[0]['BitRate'] + 1
         _logger.info("Video : %s at %dbps %s long and will be passed through", VideoInfo[0]['Format'], VideoInfo[0]['BitRate'], VideoInfo[0]['Duration'])
     else:
         # should we change the framerate?
@@ -283,6 +284,10 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
             
             if track['Channels'] == '8 / 6': track['Channels'] = 8
             if track['Channels'] == '7 / 6': track['Channels'] = 7
+            if track['Channels'] == '20 / 6': track['Channels'] = 6
+            if track['Channels'] == '7 / 7 / 6': track['Channels'] = 6
+            if track['Channels'] == '8 / 7 / 6': track['Channels'] = 6
+
             try:
                 track['BitRate']=int(track['BitRate'])
             except:
@@ -363,6 +368,7 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
                 _logger.info("Keeping Audio track :%s %sk %s channel %s, will recode to %s %s", str(AudioInfo[counter]['ID'] - 1), AudioInfo[counter]['BitRate']/1000, AudioInfo[counter]['Channels'], AudioInfo[counter]['Format'], AudioBitrate, AudioCodec)
                 # calculate the mapping
                 mapping += ['-map', '0:'+str(track['streamorder'])]
+                counter =+ 1
             
     return (mapping, ffAud, format)
 
@@ -394,7 +400,7 @@ def SubParameters(SubInfo):
                 ffSub = ffSub + ['-c:s:'+str(counter), 'copy']
                 format = 'mkv'
                 _logger.info("Keeping Subtitle track %s %s %s, will be passed through unchanged", str(track['ID'] - 1), track['Language'], track['Format'])
-        counter += 1
+            counter += 1
 
     return (mapping, ffSub, format)
 
