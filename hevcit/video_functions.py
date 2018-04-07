@@ -132,14 +132,23 @@ def GetVideoInfo(VidFileIn, TmpDir, ludicrous):
             if track.bit_rate is None:
                 _logger.debug("Bitrate cannot be determined from MediaInfo for track %s type %s", track.track_id, track.track_type)
                 tmpBitRate = ZeroBitrate(VidFileIn, int(track.track_id) - 1, 'A', TmpDir)
-                _logger.info("Bitrate from demux for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
+                _logger.debug("Bitrate from demux for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
             else:
                 tmpBitRate = track.bit_rate
-                _logger.debug("Bitrate for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
+                _logger.debug("Bitrate from mediainfo for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
 
             # tidy up the bitrate
             if "/" in str(track.bit_rate):
-                tmpBitRate = int(str(track.bit_rate).split(" / ")[0])
+                try:
+                    tmpBitRate = int(str(track.bit_rate).split(" / ")[0])
+                except:
+                    try:
+                        tmpBitRate = int(str(track.bit_rate).split(" / ")[1])
+                    except:
+                        _logger.debug("Bitrate cannot be determined from MediaInfo for track %s type %s", track.track_id, track.track_type)
+                        tmpBitRate = ZeroBitrate(VidFileIn, int(track.track_id) - 1, 'A', TmpDir)
+            
+            _logger.info("Bitrate for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
             
             # tidy up the channels
             if track.channel_s == '8 / 6':              tmpChannels = 8
@@ -150,7 +159,7 @@ def GetVideoInfo(VidFileIn, TmpDir, ludicrous):
             elif track.channel_s == 'Object Based / 8': tmpChannels = 8
             else: tmpChannels = track.channel_s
 
-            AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': tmpBitRate, 'Channels': tmpChannels, 'language': track.language, 'streamorder':streamorder })
+            AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': tmpBitRate, 'Channels': tmpChannels, 'Language': track.language, 'streamorder':streamorder })
 
         # and finally text tracks (subtitles)
         elif track.track_type == 'Text':
@@ -307,7 +316,7 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
         if len(AudioInfo) > 1:
             bestChannels=int(AudioInfo[0]['Channels'])
             bestBitrate=int(AudioInfo[0]['BitRate'])
-            bestLang=AudioInfo[0]['language']
+            bestLang=AudioInfo[0]['Language']
             bestFormat=0
 
             for track in AudioInfo:
@@ -315,23 +324,24 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
                 counter += 1
                 if   track['Format'] == 'MPEG Audio': currFormat = 0
                 elif track['Format'] == 'AAC':        currFormat = 1
-                elif track['Format'] == 'Opus':       currFormat = 2
-                elif track['Format'] == 'FLAC':       currFormat = 3
-                elif track['Format'] == 'AC-3':       currFormat = 4
-                elif track['Format'] == 'E-AC-3':     currFormat = 5
-                elif track['Format'] == 'DTS':        currFormat = 6
-                elif track['Format'] == 'TrueHD':     currFormat = 7
-                elif track['Fomrat'] == 'DTS-HD':     currFormat = 8
+                elif track['Format'] == 'Vorbis':     currFormat = 2
+                elif track['Format'] == 'Opus':       currFormat = 3
+                elif track['Format'] == 'FLAC':       currFormat = 4
+                elif track['Format'] == 'AC-3':       currFormat = 5
+                elif track['Format'] == 'E-AC-3':     currFormat = 6
+                elif track['Format'] == 'DTS':        currFormat = 7
+                elif track['Format'] == 'TrueHD':     currFormat = 8
+                elif track['Format'] == 'DTS-HD':     currFormat = 9
                 else: 
                     print 'Error format %s not catered for' %track['Format']
                     sys.exit(2)
                 if int(track['Channels']) >= bestChannels:
-                    if int(track['BitRate']) > bestBitrate or (bestLang != 'en' and track['langauge'] == 'en') or currFormat > bestFormat:
+                    if int(track['BitRate']) > bestBitrate or (bestLang != 'en' and track['Language'] == 'en') or currFormat > bestFormat:
                         bestTrackID=AudioInfo[0]['ID']
                         bestTrackIx=counter
 
 
-        _logger.info("Best track ID : %s, Index : %s which is %sk %s channel %s", bestTrackID, bestTrackIx, AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'])
+        _logger.info("Best track ID : %s, Index : %s which is %sk %s channel %s in %s", bestTrackID, bestTrackIx, AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'], AudioInfo[bestTrackIx]['Language'])
         
         # just the one track required
         if AudioProcess in ("one", "aac", "64k"):

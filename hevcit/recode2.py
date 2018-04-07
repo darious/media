@@ -39,6 +39,7 @@ cli_parser.add_argument('-s','--process', metavar='<process>', help='Method to b
 cli_parser.add_argument('-f','--file', metavar='<file>', help='File or folder to process', required=True)
 cli_parser.add_argument('-d','--debug', help='Debug mode, very verbose', required=False,action='store_true')
 cli_parser.add_argument('-l','--ludicrous', help='Print a ludicrous amount of information about the source tracks', required=False,action='store_true')
+cli_parser.add_argument('-k','--backwards', help='Process in reverse order, i.e. z-a', required=False,action='store_true')
 cli_args = cli_parser.parse_args()
 
 
@@ -202,8 +203,11 @@ def RecodeFile(filename):
 def RecodeFolder (FolderName):
     logger.debug("Processing a folder : %s", FolderName)
     Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(FolderName) for f in filenames if os.path.splitext(f)[1] in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg', '.3gp')]
-    Files.sort()
-    #Files.sort(reverse=True)
+    if cli_args.backwards == True:
+        Files.sort(reverse=True)
+    else:
+        Files.sort()
+    
     for File in Files:
         logger.debug("Found in folder %s file %s", FolderName, File)
         RecodeFile(File)
