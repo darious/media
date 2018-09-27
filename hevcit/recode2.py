@@ -74,12 +74,13 @@ def RecodeFile(filename):
 
     # are we gonna rescale
     if cli_args.rescale <> None and cli_args.bitrate <> "pass":
-        ffRescale, NewWidth = video.VideoRescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], cli_args.rescale)
+        ffRescale, NewWidth, HewHeight = video.VideoRescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], cli_args.rescale)
     else:
         NewWidth = VideoInfo[0]['Width']
+        HewHeight = VideoInfo[0]['Height']
         ffRescale = []
 
-    mapVid, ffVid, NewBitrate = video.VideoParameters(VideoInfo, cli_args.bitrate, cli_args.video, AllInfo, LowBitRate)
+    mapVid, ffVid, NewBitrate = video.VideoParameters(VideoInfo, cli_args.bitrate, cli_args.video, AllInfo, LowBitRate, NewWidth, HewHeight)
 
     # some debug logging
     logger.debug("mapVid     : %s", mapVid)
@@ -117,7 +118,7 @@ def RecodeFile(filename):
             ffSub = []
             formatSub = []
         else:		
-            mapSub, ffSub, formatSub= video.SubParameters(SubInfo)
+            mapSub, ffSub, formatSub= video.SubParameters(SubInfo, formatAud)
             # some debug logging
             logger.debug("mapSub    : %s", mapSub)
             logger.debug("ffSub     : %s", ffSub)

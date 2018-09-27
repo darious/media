@@ -100,7 +100,10 @@ def GetVideoInfo(VidFileIn, TmpDir, ludicrous):
             try:
                 streamorder = int(track.streamorder)
             except:
-                streamorder = int(track.streamorder.split('-')[1])
+                try:
+                    streamorder = int(track.streamorder.split('-')[1])
+                except:
+                    streamorder = 0
             _logger.debug("Stream order for track %s type %s is %s", track.track_id, track.track_type, streamorder)
             AllInfo.append ({ 'Type':track.track_type, 'ID': track.track_id, 'counter':counter, 'streamorder':streamorder })
 
@@ -157,6 +160,7 @@ def GetVideoInfo(VidFileIn, TmpDir, ludicrous):
             elif track.channel_s == '7 / 7 / 6':        tmpChannels = 6
             elif track.channel_s == '8 / 7 / 6':        tmpChannels = 6
             elif track.channel_s == 'Object Based / 8': tmpChannels = 8
+            elif track.channel_s == 'Object Based / 8 / 6': tmpChannels = 8
             else: tmpChannels = track.channel_s
 
             AudioInfo.append ({ 'ID': track.track_id, 'Format': track.format, 'BitRate': tmpBitRate, 'Channels': tmpChannels, 'Language': track.language, 'streamorder':streamorder })
@@ -188,10 +192,10 @@ def VideoRescaleCalc(OldWidth, OldHeight, RescaleWidth):
         _logger.info("Asked to rescale, but New Width of %s is greater than start Width of %s so not changing", RescaleWidth, OldWidth)
 
     ffRescale = ['-vf', 'scale='+str(NewWidth)+':'+str(HewHeight)]
-    return ffRescale, NewWidth
+    return ffRescale, NewWidth, HewHeight
 
 
-def VideoParameters(VideoInfo, TargetBitrate, VideoCodec, AllInfo, LowBitRate):
+def VideoParameters(VideoInfo, TargetBitrate, VideoCodec, AllInfo, LowBitRate, NewWidth, HewHeight):
     """Work out the video parameters to use in the recode
     Parameters : VideoInfo - The videoinfo to use (dict)
                : TargetBitrate - TargetBitrate to use
@@ -237,11 +241,11 @@ def VideoParameters(VideoInfo, TargetBitrate, VideoCodec, AllInfo, LowBitRate):
 
         # calculate the new bitrate
         if TargetBitrate == "calc":
-            NewBitrate = int(round((((int(VideoInfo[0]['Width']) * int(VideoInfo[0]['Height']) * float(TargetFrameRate)) / 1000000) + 11) * 37, 0))
+            NewBitrate = int(round((((int(NewWidth) * int(HewHeight) * float(TargetFrameRate)) / 1000000) + 11) * 37, 0))
         elif TargetBitrate == "calc2":
-            NewBitrate = int(round((((int(VideoInfo[0]['Width']) * int(VideoInfo[0]['Height']) * float(TargetFrameRate)) / 1000000) + 11) * 83, 0))
+            NewBitrate = int(round((((int(NewWidth) * int(HewHeight) * float(TargetFrameRate)) / 1000000) + 11) * 83, 0))
         elif TargetBitrate == "calc3":
-            NewBitrate = int(round((((int(VideoInfo[0]['Width']) * int(VideoInfo[0]['Height']) * float(TargetFrameRate)) / 1000000) + 11) * 132, 0))
+            NewBitrate = int(round((((int(NewWidth) * int(HewHeight) * float(TargetFrameRate)) / 1000000) + 11) * 132, 0))
         elif TargetBitrate == "half":
             NewBitrate = int(round(float(VideoInfo[0]['BitRate']) / 2))
         else:
@@ -409,7 +413,7 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
     return (mapping, ffAud, format)
 
 
-def SubParameters(SubInfo):
+def SubParameters(SubInfo, format):
     """Work out the subtitle parameters to use in the recode
     Parameters : SubInfo - The SubInfo to use (dict)
     Returns:   : mapping - The mapping of input streams to output for ffmpeg
@@ -419,21 +423,25 @@ def SubParameters(SubInfo):
     ffSub=[]
     mapping=[]
     counter = 0
-    format = 'mp4'
 
     for track in SubInfo:
         if track['Language'] == 'en' or track['Forced'] == 'Yes':
             #or track['Default'] == 'Yes' 
             # subtitle is english, default or forced, so we'll keep it
             mapping += ['-map', '0:'+str(track['streamorder'])]
-            if track['Format'] in ("ASS", "UTF-8", "SSA"):
-                # a format we can recode so we will
-                ffSub = ffSub + ['-c:s:'+str(counter), 'ass']
-                format = 'mkv'
+            # a format we can recode so we will
+            if track['Format'] in ("ASS", "UTF-8", "SSA", "Timed Text"):
+                # if we have an mp4 (based on the Audio) then use a compatible format for the subtitles
+                if format == 'mp4':
+                    ffSub = ffSub + ['-c:s:'+str(counter), 'mov_text']
+                # otherwise use a nicer format 
+                else:
+                    ffSub = ffSub + ['-c:s:'+str(counter), 'ass']
                 _logger.info("Keeping Subtitle track %s %s %s, will recode to Advanced SubStation Alpha", str(track['ID'] - 1), track['Language'], track['Format'])
             if track['Format'] in ("PGS", "VobSub"):
                 # a format we can't code, so we'll just pass it through
                 ffSub = ffSub + ['-c:s:'+str(counter), 'copy']
+                # which means we have to use mkv
                 format = 'mkv'
                 _logger.info("Keeping Subtitle track %s %s %s, will be passed through unchanged", str(track['ID'] - 1), track['Language'], track['Format'])
             counter += 1
