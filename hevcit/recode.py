@@ -384,7 +384,7 @@ def AudioParameters(AudioInfo, fileExt, AllInfo):
 	else:
 		# loop through all the audio tracks
 		for track in AudioInfo:
-			# fix the meta data if required
+			# clean up meta data if required
 			if track['Channels'] == '8 / 6':
 				track['Channels'] = 8
 			if track['Channels'] == '7 / 6':
@@ -563,7 +563,7 @@ def RecodeFile (VidFileIn):
 	# get the info all all the tracks in the file
 	VideoInfo, AudioInfo, SubInfo, AllInfo = GetVideoInfo(VidFileInWin)
 	
-	#debug
+	# print some vars
 	#print VideoInfo
 	#print AudioInfo
 	#print SubInfo
