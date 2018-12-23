@@ -225,7 +225,7 @@ def Recoder(bitrate, audio, videocodec, rescale, test, printmode, process, file,
     elif os.path.isdir(file) == True:
         logger.debug("Have been given a folder")
         # find all the files and process them
-        Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(file) for f in filenames if os.path.splitext(f)[1] in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg', '.3gp').lower()]
+        Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(file) for f in filenames if os.path.splitext(f)[1].lower() in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg', '.3gp')]
         if backwards == True:
             Files.sort(reverse=True)
         else:
