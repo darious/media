@@ -305,7 +305,7 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
         # no audio
         _logger.warning("No audio tracks found")
     else:
-        # fix the channel metadata if required
+        # clena up the channel metadata if required
         for track in AudioInfo:
             try:
                 track['BitRate']=int(track['BitRate'])
