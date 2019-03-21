@@ -348,7 +348,7 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
         _logger.info("Best track ID : %s, Index : %s which is %sk %s channel %s in %s", bestTrackID, bestTrackIx, AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'], AudioInfo[bestTrackIx]['Language'])
         
         # just the one track required
-        if AudioProcess in ("one", "aac", "64k"):
+        if AudioProcess == "one":
             if AudioInfo[bestTrackIx]['Channels'] >= 6:
                 AudioBitrate = '384k'
                 AudioCodec = 'ac3'
@@ -367,6 +367,22 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
             mapping = ['-map', '0:'+str(AudioInfo[bestTrackIx]['streamorder'])]
 
             _logger.info("Keeping Audio track :%s %sk %s channel %s, will recode to %s %s", str(AudioInfo[bestTrackIx]['ID'] - 1), AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'], AudioBitrate, AudioCodec)
+
+        # recode to 2 channel aac
+        elif AudioProcess in ("aac", "64k"):
+            if AudioProcess == "64k":
+                AudioBitrate = '64k'
+            else:
+                AudioBitrate = '128k'
+
+            AudioCodec = 'libfdk_aac'
+            format = 'mp4'
+
+            # calculate the mapping
+            mapping = ['-map', '0:'+str(AudioInfo[bestTrackIx]['streamorder'])]
+
+            _logger.info("Keeping Audio track :%s %sk %s channel %s, will recode to %s %s", str(AudioInfo[bestTrackIx]['ID'] - 1), AudioInfo[bestTrackIx]['BitRate']/1000, AudioInfo[bestTrackIx]['Channels'], AudioInfo[bestTrackIx]['Format'], AudioBitrate, AudioCodec)
+
 
         # pass throught the best track
         elif AudioProcess == "passbest":
