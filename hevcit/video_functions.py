@@ -113,6 +113,10 @@ def GetVideoInfo(VidFileIn, TmpDir, ludicrous):
             try:
                 tmpBitRate = int(track.bit_rate)
                 _logger.info("Bitrate for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
+                ## This is herrible and needs to go away, but mediainfo is reporting the bitrate wrong on hevc files
+                if track.format == 'HEVC':
+                    tmpBitRate = ZeroBitrate(VidFileIn, 0, 'V', TmpDir)
+                    _logger.info("Bitrate from demux for track %s type %s is %s", track.track_id, track.track_type, tmpBitRate)
             except:
                 _logger.debug("Bitrate cannot be determined from MediaInfo for track %s type %s", track.track_id, track.track_type)
                 # guess based on the filesize and other info
@@ -454,7 +458,7 @@ def SubParameters(SubInfo, format):
                 else:
                     ffSub = ffSub + ['-c:s:'+str(counter), 'ass']
                 _logger.info("Keeping Subtitle track %s %s %s, will recode to Advanced SubStation Alpha", str(track['ID'] - 1), track['Language'], track['Format'])
-            if track['Format'] in ("PGS", "VobSub"):
+            if track['Format'] in ("PGS", "VobSub", "DVB Subtitle"):
                 # a format we can't code, so we'll just pass it through
                 ffSub = ffSub + ['-c:s:'+str(counter), 'copy']
                 # which means we have to use mkv

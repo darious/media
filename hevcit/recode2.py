@@ -31,7 +31,7 @@ def SetupConstants():
     return(TmpDir, BackupDir, LowBitRate)
 
 
-def RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, filename, debug, ludicrous, TmpDir, BackupDir, LowBitRate):
+def RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, filename, debug, ludicrous, TmpDir, BackupDir, LowBitRate, gpuid):
     # will turn this into a procedure so that we can process folders as well as files
     logger.info("Starting processing on '%s'", filename)
 
@@ -48,7 +48,8 @@ def RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, fi
     logger.debug("ludicrous  : " + str(ludicrous ))               
     logger.debug("TmpDir     : " + str(TmpDir    ))            
     logger.debug("BackupDir  : " + str(BackupDir ))               
-    logger.debug("LowBitRate : " + str(LowBitRate))                
+    logger.debug("LowBitRate : " + str(LowBitRate))    
+    logger.debug("GPUID      : " + str(gpuid     ))            
 
     # grab the file extension
     FileExt = os.path.splitext(filename)[1]
@@ -174,7 +175,11 @@ def RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, fi
         ffCommand = ['ffmpeg_g.exe', '-hide_banner', '-y', '-i'] + [VidFileIn]
         if test <> None:
             ffCommand = ffCommand + ['-t', test]
+
+        # add the gpuid
+        ffCommand = ffCommand + ['-gpu', str(gpuid)]
         
+        # create the final command
         ffCommand = ffCommand + mapping + ffVid + ffRescale + ffAud + ffSub + [VifFileOt]
 
 
@@ -191,7 +196,7 @@ def RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, fi
             logger.info("Complete ffmpeg command : %s", ' '.join(ffCommand))
 
 
-def Recoder(bitrate, audio, videocodec, rescale, test, printmode, process, file, debug, ludicrous, backwards):
+def Recoder(bitrate, audio, videocodec, rescale, test, printmode, process, file, debug, ludicrous, backwards, gpuid):
     """
     Main function so that we can call this from the cli and use it as a lib
         :param bitrate: Bitrate to encode to, use calc, calc2 or calc3 to set automatically
@@ -205,6 +210,7 @@ def Recoder(bitrate, audio, videocodec, rescale, test, printmode, process, file,
         :param debug: Debug mode, very verbose
         :param ludicrous: Print a ludicrous amount of information about the source tracks
         :param backwards: Process in reverse order, i.e. z-a
+        :param gpuid: gpu to use
     """
 
     # stash the constants
@@ -221,18 +227,18 @@ def Recoder(bitrate, audio, videocodec, rescale, test, printmode, process, file,
     # have we been given a file or a folder
     if os.path.isfile(file) == True:
         logger.debug("Have been given a file")
-        RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, file, debug, ludicrous, TmpDir, BackupDir, LowBitRate)
+        RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, file, debug, ludicrous, TmpDir, BackupDir, LowBitRate, gpuid)
     elif os.path.isdir(file) == True:
         logger.debug("Have been given a folder")
         # find all the files and process them
-        Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(file) for f in filenames if os.path.splitext(f)[1].lower() in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg', '.3gp')]
+        Files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(file) for f in filenames if os.path.splitext(f)[1].lower() in ('.mp4', '.mkv', '.m4v', '.avi', '.mov', '.flv', '.wmv', '.mpg', '.3gp', '.ts')]
         if backwards == True:
             Files.sort(reverse=True)
         else:
             Files.sort()
         for f in Files:
             logger.debug("Found in folder %s file %s", file, f)
-            RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, f, debug, ludicrous, TmpDir, BackupDir, LowBitRate)
+            RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, f, debug, ludicrous, TmpDir, BackupDir, LowBitRate, gpuid)
     else:
         logger.critical("Error not supplied with a valid file or folder : %s", file)
 
@@ -255,6 +261,7 @@ if __name__ == '__main__':
     cli_parser.add_argument('-d','--debug', help='Debug mode, very verbose', required=False,action='store_true')
     cli_parser.add_argument('-l','--ludicrous', help='Print a ludicrous amount of information about the source tracks', required=False,action='store_true')
     cli_parser.add_argument('-k','--backwards', help='Process in reverse order, i.e. z-a', required=False,action='store_true')
+    cli_parser.add_argument('-g','--gpuid', help='GPU to use', required=False,default=0)
     cli_args = cli_parser.parse_args()
 
     # setup a logger
@@ -266,5 +273,5 @@ if __name__ == '__main__':
     for arg in vars(cli_args):
         logger.debug("Cli argument - %s: %s", arg.ljust(10),getattr(cli_args, arg))
 
-    Recoder(cli_args.bitrate, cli_args.audio, cli_args.video, cli_args.rescale, cli_args.test, cli_args.printmode, cli_args.process, cli_args.file, cli_args.debug, cli_args.ludicrous, cli_args.backwards)
+    Recoder(cli_args.bitrate, cli_args.audio, cli_args.video, cli_args.rescale, cli_args.test, cli_args.printmode, cli_args.process, cli_args.file, cli_args.debug, cli_args.ludicrous, cli_args.backwards, cli_args.gpuid)
 
