@@ -232,7 +232,7 @@ def ExecuteFFmpeg(command):
     # Poll process for new output until finished
     for line in iter(process.stderr.readline, ""):
 #        if line[0:5] == 'frame':
-        print line,
+        print(line),
         output += line
 
 

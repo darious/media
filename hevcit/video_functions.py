@@ -10,7 +10,7 @@ import datetime
 import sys
 import os
 import subprocess
-import base64
+import random, string
 
 # import mediainfo
 from pymediainfo import MediaInfo
@@ -24,7 +24,8 @@ _logger=core.module_null_logger(__name__)
 def ZeroBitrate(VidFileIn, TrackID, Type, TmpDir):
     _logger.info("Got a 0 bitrate so creating temp file to check %s track %s", VidFileIn, TrackID)
     # deal with a 0 bitrate and work out what it is
-    tmpRandom = base64.b64encode(os.urandom(12), '__')
+    letters = string.ascii_lowercase
+    tmpRandom = ''.join(random.choice(letters) for i in range(12))
     VidFileTemp = TmpDir + os.path.basename(VidFileIn) + '_' + tmpRandom + '.mkv'
 
     # create a new file with just this stream
@@ -33,7 +34,7 @@ def ZeroBitrate(VidFileIn, TrackID, Type, TmpDir):
     if Type == 'A':
         codec = ['-c:a:0', 'copy', '-vn']
 
-    ffCommand = ['ffmpeg_g.exe',  '-i',  VidFileIn] + codec + [VidFileTemp]
+    ffCommand = ['ffmpeg.exe',  '-i',  VidFileIn] + codec + [VidFileTemp]
 
     # show the command
     _logger.info("Creating temp file with ffmpeg command : %s", ' '.join(ffCommand))
@@ -224,7 +225,7 @@ def VideoParameters(VideoInfo, TargetBitrate, VideoCodec, AllInfo, LowBitRate, N
         elif VideoInfo[0]['FrameRate'] == 24.97: TargetFrameRate = 25
         else: TargetFrameRate = VideoInfo[0]['FrameRate']
 
-        if TargetFrameRate <> VideoInfo[0]['FrameRate']:
+        if TargetFrameRate != VideoInfo[0]['FrameRate']:
             _logger.warning("Got a framerate of %s So resampling with -r %s.", VideoInfo[0]['FrameRate'], TargetFrameRate)
             Resample = ['-r', str(TargetFrameRate)]
         else:
@@ -266,12 +267,12 @@ def VideoParameters(VideoInfo, TargetBitrate, VideoCodec, AllInfo, LowBitRate, N
 
         # deal with the formats
         if VideoCodec == "h265":
-            ffcodec = 'nvenc_hevc'
+            ffcodec = 'hevc_nvenc'
         elif VideoCodec == "h264":
             ffcodec = 'nvenc'
         
         # create the bits of the ffmpeg command for the video
-        ffVid = ['-c:v', ffcodec, '-b:v', str(NewBitrate)+'k', '-maxrate', '20000k', '-preset', 'hq']
+        ffVid = ['-c:v', ffcodec, '-b:v', str(NewBitrate)+'k', '-maxrate', '20000k', '-preset', 'p7']
         # add any extra parts
         ffVid = ffVid + Resample + Deinterlace
 
@@ -336,8 +337,8 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
                 elif track['Format'] == 'DTS':        currFormat = 7
                 elif track['Format'] == 'TrueHD':     currFormat = 8
                 elif track['Format'] == 'DTS-HD':     currFormat = 9
-                else: 
-                    print 'Error format %s not catered for' %track['Format']
+                else:
+                    _logger.error('Error format %s not catered for' %track['Format'])
                     sys.exit(2)
                 if int(track['Channels']) >= bestChannels:
                     if int(track['BitRate']) > bestBitrate or (bestLang != 'en' and track['Language'] == 'en') or currFormat > bestFormat:
@@ -355,7 +356,7 @@ def AudioParameters(AudioInfo, fileExt, AudioProcess, AllInfo):
                 format = 'mkv'
             else:
                 AudioBitrate = '128k'
-                AudioCodec = 'libfdk_aac'
+                AudioCodec = 'aac'
                 format = 'mp4'
 
             if AudioProcess == '64k':

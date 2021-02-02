@@ -4,13 +4,14 @@ recode v2.py
 
 Ver  Date       Author      Comment
 2.00 2018-04-02 Chris Cook  Recoded to be more pythonic and split into modules
+3.00 2020-11-15 Chris Cook  Updated to work in python 3
 
 """
 
 import sys
 import os
 import argparse
-import base64
+import random, string
 import threading
 import subprocess
 
@@ -24,7 +25,7 @@ import video_functions as video
 
 def SetupConstants():
     # store some constants
-    TmpDir = 'H:/Video/temp/'
+    TmpDir = 'G:/Video/temp/'
     BackupDir = '//tank03/backup/video/'
     LowBitRate = 500
 
@@ -63,7 +64,7 @@ def RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, fi
     logger.debug("AllInfo   : %s", AllInfo)
 
     # are we gonna rescale
-    if rescale <> None and bitrate <> "pass":
+    if rescale != None and bitrate != "pass":
         ffRescale, NewWidth, HewHeight = video.VideoRescaleCalc(VideoInfo[0]['Width'], VideoInfo[0]['Height'], rescale)
     else:
         NewWidth = VideoInfo[0]['Width']
@@ -79,7 +80,7 @@ def RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, fi
 
     # check work is required
     workreq = 0
-    if VideoInfo[0]['Format'] <> 'HEVC':
+    if VideoInfo[0]['Format'] != 'HEVC':
         workreq=1
         workreas='video is not encoded in HEVC'
     elif int(NewWidth) < int(VideoInfo[0]['Width']):
@@ -150,7 +151,8 @@ def RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, fi
 
 
         elif process == 'replace':
-            tmpRandom = base64.b64encode(os.urandom(12), '__')
+            letters = string.ascii_lowercase
+            tmpRandom = ''.join(random.choice(letters) for i in range(12))
             VidFileIn = os.path.splitext(filename)[0] + '_' + tmpRandom + os.path.splitext(filename)[1]
             VifFileOt = os.path.splitext(filename)[0] + '.' + format
             if printmode != True:
@@ -171,8 +173,8 @@ def RecodeFile(bitrate, audio, videocodec, rescale, test, printmode, process, fi
         logger.debug("Complete mapping : %s", mapping)
 
         # create the ffmpeg command
-        ffCommand = ['ffmpeg_g.exe', '-hide_banner', '-y', '-i'] + [VidFileIn]
-        if test <> None:
+        ffCommand = ['ffmpeg.exe', '-hide_banner', '-y', '-i'] + [VidFileIn]
+        if test != None:
             ffCommand = ffCommand + ['-t', test]
         
         ffCommand = ffCommand + mapping + ffVid + ffRescale + ffAud + ffSub + [VifFileOt]
